@@ -38,7 +38,15 @@ df = df.iloc[0:(row_count - 6), 0:6]
 latency_col_title = getLatencyCol(df)
 
 latencies = df[latency_col_title]
+latencies = latencies.astype(float)
 
-console.print(latencies.to_string())
+latencies.plot(y="Latencies")
+plt.show()
 
+# console.print(latencies[0:10].to_string())
+
+# data = [6.1,5.8,5.7,5.7,5.8,5.6,5.5,5.3,5.2,5.2]
+  
+# df = pd.DataFrame(data)
 # df.plot()
+# plt.show()
