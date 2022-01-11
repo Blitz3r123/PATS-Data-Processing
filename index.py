@@ -41,7 +41,7 @@ latencies = df[latency_col_title]
 latencies = latencies.astype(float)
 
 latencies.plot(y="Latencies")
-plt.show()
+plt.savefig('file.pdf')
 
 # console.print(latencies[0:10].to_string())
 
