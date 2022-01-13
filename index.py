@@ -1,7 +1,9 @@
 import csv
 import inspect
 import os
+import pathlib
 
+from rich.markdown import Markdown
 from rich.console import Console
 console = Console()
 
@@ -17,43 +19,45 @@ all_files = []
         If csv file
             Store the filepath
 """
-def read_dir(dir_path):
-    dir_contents = os.listdir(dir_path)
-    for dir_content in dir_contents:
-
-        dir_content_path = os.path.join(dir_path, dir_content)
-        
-        if os.path.isdir(dir_content_path):
-            read_dir(dir_content_path)
+def get_files(dir_path):
+    file_list = os.listdir(dir_path)
+    all_files = list()
+    # Iterate over all the entries
+    for entry in file_list:
+        # Create full path
+        full_path = os.path.join(dir_path, entry)
+        # If entry is a directory then get the list of files in this directory 
+        if os.path.isdir(full_path):
+            all_files = all_files + get_files(full_path)
         else:
-            all_files.append(dir_content_path)
-            return dir_content_path
+            all_files.append(full_path)
+                
+    return all_files
 
-read_dir("data")
 
+def clean_data(files):
+    for file in files[0:5]:
+        console.print(Markdown("# " + file), style="bold white")
+        # console.print(Markdown("## " + os.path.basename(file)), style="bold white")
+
+        open_file = open(file)
+        csvreader = csv.reader(open_file)
+
+        new_output = []
+        # Remove all empty cells
+        for row in csvreader:
+            new_row = []
+            for cell in row:
+                if cell != "":
+                    new_row.append(cell)
+            new_output.append(new_row)
+
+        # Clean data into header and numbers
+        
+        
+            
+         
+
+all_files = get_files("data")
 csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
-
-#
-# Clean data
-#
-"""
-    Find the first appearance of a number
-    Find the first appereance of a letter after the first number
-    Everything in between is the data
-    The row before first appearance of number contains the headings
-"""
-# for csv_file in csv_files:
-file = open(csv_files[0])
-
-csvreader = csv.reader(file)
-
-# Get all rows where first position is a number (this includes the final row being the summary row)
-numeric_rows = []
-for row in csvreader:
-    if row[0].isdigit():
-       numeric_rows.append(row)
-
-# Remove the final summary row
-del numeric_rows[-1]
-
-console.print(numeric_rows, style="green")
+clean_data(csv_files)
