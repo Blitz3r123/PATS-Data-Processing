@@ -1,3 +1,5 @@
+import csv
+import inspect
 import os
 
 from rich.console import Console
@@ -41,3 +43,17 @@ csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
     The row before first appearance of number contains the headings
 """
 # for csv_file in csv_files:
+file = open(csv_files[0])
+
+csvreader = csv.reader(file)
+
+# Get all rows where first position is a number (this includes the final row being the summary row)
+numeric_rows = []
+for row in csvreader:
+    if row[0].isdigit():
+       numeric_rows.append(row)
+
+# Remove the final summary row
+del numeric_rows[-1]
+
+console.print(numeric_rows, style="green")
