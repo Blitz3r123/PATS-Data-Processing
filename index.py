@@ -1,52 +1,43 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-from rich.console import Console
+import os
 
+from rich.console import Console
 console = Console()
 
-plt.close("all")
+all_files = []
 
-def getLatencyCol(dataframe):
-    """
-    Returns the name of the column that has "latency" in it.
+#
+# List data
+#
+"""
+    For each item in folder
+        If folder
+            Repeat this function
+        If csv file
+            Store the filepath
+"""
+def read_dir(dir_path):
+    dir_contents = os.listdir(dir_path)
+    for dir_content in dir_contents:
 
-    :param dataframe: data where the latency column resides
-    :return: returns column title that contains "latency"
-    """
-    for col in df.columns.values.tolist():
-        if "latency" in col.lower():
-            latency_col_title = col
+        dir_content_path = os.path.join(dir_path, dir_content)
+        
+        if os.path.isdir(dir_content_path):
+            read_dir(dir_content_path)
+        else:
+            all_files.append(dir_content_path)
+            return dir_content_path
 
-    if not latency_col_title:
-        console.print("""
-    [yellow]WARNING:[/yellow] Latency not found in any column.
-        """)
-        return ""
-    else:
-        return latency_col_title
+read_dir("data")
 
-raw_df = pd.read_csv('base_case_multicast/run_1/vm1_output/pub_output.csv')
-row_count = len(raw_df)
+csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
 
-# Skip first 4 rows
-df = pd.read_csv('base_case_multicast/run_1/vm1_output/pub_output.csv', skiprows=4)
-
-# Choose which rows and columns to include:
-# [row_start:row_end, col_start: col_end]
-df = df.iloc[0:(row_count - 6), 0:6]
-
-latency_col_title = getLatencyCol(df)
-
-latencies = df[latency_col_title]
-latencies = latencies.astype(float)
-
-latencies.plot(y="Latencies")
-plt.savefig('file.pdf')
-
-# console.print(latencies[0:10].to_string())
-
-# data = [6.1,5.8,5.7,5.7,5.8,5.6,5.5,5.3,5.2,5.2]
-  
-# df = pd.DataFrame(data)
-# df.plot()
-# plt.show()
+#
+# Clean data
+#
+"""
+    Find the first appearance of a number
+    Find the first appereance of a letter after the first number
+    Everything in between is the data
+    The row before first appearance of number contains the headings
+"""
+# for csv_file in csv_files:
