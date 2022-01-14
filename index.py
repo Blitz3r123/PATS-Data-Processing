@@ -18,8 +18,6 @@ console = Console()
             Store the filepath
 """
 def get_files(dir_path):
-    
-
     file_list = os.listdir(dir_path)
     all_files = list()
     # Iterate over all the entries

@@ -1,2 +1,6 @@
 /data
 ./data
+*.ipynb
+./*.ipynb
+.ipynb_checkpoints
+./.ipynb_checkpoints
