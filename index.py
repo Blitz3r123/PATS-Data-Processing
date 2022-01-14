@@ -42,9 +42,15 @@ def is_number(str):
     else:
         return(True)
 
-def clean_data(files):
-
+def delete_clean_files(files):
     for file in files:
+        # Delete all files with clean_ at the start
+        if "clean_" in file:
+            os.remove(file)
+
+def clean_data(files):
+    for file in files:
+
         # console.print(Markdown("# " + file), style="bold white")
 
         open_file = open(file)
@@ -106,6 +112,12 @@ def clean_data(files):
                 writer.writerow(headers)
                 writer.writerows(clean_numeric_output)
 
+with console.status("Collecting all files..."):
+    all_files = get_files("data")
+with console.status("Selecting csv files..."):
+    csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
+with console.status("Deleting any previous clean data..."):
+    delete_clean_files(csv_files)
 with console.status("Collecting all files..."):
     all_files = get_files("data")
 with console.status("Selecting csv files..."):
