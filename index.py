@@ -2,6 +2,7 @@ import csv
 import inspect
 import os
 import pathlib
+import re
 
 from rich.markdown import Markdown
 from rich.console import Console
@@ -88,9 +89,24 @@ def clean_data(files):
 
         # If there are no measurements (clean_numeric_output is empty) then get headers
         if clean_numeric_output:
-            headers = clean_string_output[-1]
+            for line in clean_string_output:
+                if len(line) > 1:
+                    headers = line
         else:
             headers = []
+
+        # 
+        # Check headers and data have same number of columns
+        #
+        # if headers and clean_numeric_output:
+        #     if len(headers) != len(clean_numeric_output[0]):
+        #         console.print(file, style="red")
+        #         console.print(len(headers), style="white")
+        #         console.print(headers, style="blue")
+
+        #         console.print(len(clean_numeric_output[0]), style="white")
+        #         console.print(clean_numeric_output[0], style="blue")
+        #         console.print(Markdown("---"), style="white")
 
         clean_output = [headers, clean_numeric_output]
 
@@ -116,9 +132,9 @@ with console.status("Selecting csv files..."):
     csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
 with console.status("Deleting any previous clean data..."):
     delete_clean_files(csv_files)
-with console.status("Collecting all files..."):
+with console.status("Collecting all files again..."):
     all_files = get_files("data")
-with console.status("Selecting csv files..."):
+with console.status("Selecting csv files again..."):
     csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
 with console.status("Cleaning data..."):
     clean_data(csv_files)
