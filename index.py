@@ -7,8 +7,6 @@ from rich.markdown import Markdown
 from rich.console import Console
 console = Console()
 
-all_files = []
-
 #
 # List data
 #
@@ -20,6 +18,8 @@ all_files = []
             Store the filepath
 """
 def get_files(dir_path):
+    
+
     file_list = os.listdir(dir_path)
     all_files = list()
     # Iterate over all the entries
@@ -43,8 +43,9 @@ def is_number(str):
         return(True)
 
 def clean_data(files):
-    for file in files[0:5]:                                                             # !!! Don't forget to remove [0:5] !!! #
-        console.print(Markdown("# " + file), style="bold white")
+
+    for file in files:
+        # console.print(Markdown("# " + file), style="bold white")
 
         open_file = open(file)
         csvreader = csv.reader(open_file)
@@ -63,7 +64,7 @@ def clean_data(files):
         clean_numeric_output = []
         clean_string_output = []
         # Parse any strings into integers
-        for row in new_output[0:20]:                                                    # Don't forget to remove [0:20]
+        for row in new_output:
             new_numeric_row = []
             new_string_row = []
             for cell in row:
@@ -96,11 +97,18 @@ def clean_data(files):
         old_folder_path = os.path.dirname(file)
         new_file_path = os.path.join(old_folder_path, new_file_name)
 
-        with open(new_file_path, 'w', encoding='UTF8', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            writer.writerows(clean_numeric_output)
+        # Delete any files with same name
+        if os.path.exists(new_file_path):
+            os.remove(new_file_path)
+        else:
+            with open(new_file_path, 'w', encoding='UTF8', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
+                writer.writerows(clean_numeric_output)
 
-all_files = get_files("data")
-csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
-clean_data(csv_files)
+with console.status("Collecting all files..."):
+    all_files = get_files("data")
+with console.status("Selecting csv files..."):
+    csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
+with console.status("Cleaning data..."):
+    clean_data(csv_files)
