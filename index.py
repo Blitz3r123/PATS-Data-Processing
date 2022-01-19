@@ -1,8 +1,8 @@
 import csv
 import inspect
 import os
-import pathlib
 import re
+import rich
 
 from rich.markdown import Markdown
 from rich.console import Console
@@ -84,29 +84,19 @@ def clean_data(files):
         
         open_file.close()
 
+        # Remove last row because its the summary
+        clean_numeric_output = clean_numeric_output[:-1]
+
         # clean_numeric_output has all numeric data in it
         # clean_string_output has all string data in it
 
-        # If there are no measurements (clean_numeric_output is empty) then get headers
-        if clean_numeric_output:
-            for line in clean_string_output:
-                if len(line) > 1:
-                    headers = line
+        # Add custom headers depending on if file is pub or sub
+        if "pub" in file:
+            headers = ["Length", "Latency", "Average Latency", "Standard Deviation", "Minimum Latency", "Maximum Latency"]
+        elif "sub" in file:
+            headers = ["Length", "Total Samples", "Samples Per Second", "Average Samples Per Second", "Throughput", "Average Throughput", "Lost Samples", "Lost Samples Percentage"]
         else:
-            headers = []
-
-        # 
-        # Check headers and data have same number of columns
-        #
-        # if headers and clean_numeric_output:
-        #     if len(headers) != len(clean_numeric_output[0]):
-        #         console.print(file, style="red")
-        #         console.print(len(headers), style="white")
-        #         console.print(headers, style="blue")
-
-        #         console.print(len(clean_numeric_output[0]), style="white")
-        #         console.print(clean_numeric_output[0], style="blue")
-        #         console.print(Markdown("---"), style="white")
+            console.print("What file is this?! It ain't got 'pub' or 'sub' in it's name.", style="bold red")
 
         clean_output = [headers, clean_numeric_output]
 
