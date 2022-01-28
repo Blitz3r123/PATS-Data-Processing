@@ -3,6 +3,7 @@ import inspect
 import os
 import re
 import rich
+import sys
 
 from rich.markdown import Markdown
 from rich.console import Console
@@ -96,7 +97,7 @@ def clean_data(files):
         elif "sub" in file:
             headers = ["Length", "Total Samples", "Samples Per Second", "Average Samples Per Second", "Throughput", "Average Throughput", "Lost Samples", "Lost Samples Percentage"]
         else:
-            console.print("What file is this?! It ain't got 'pub' or 'sub' in it's name.", style="bold red")
+            print("What file is this?! It ain't got 'pub' or 'sub' in it's name.")
 
         clean_output = [headers, clean_numeric_output]
 
@@ -116,14 +117,21 @@ def clean_data(files):
                 writer.writerow(headers)
                 writer.writerows(clean_numeric_output)
 
+        # Delete any files with clean_clean in it
+        
+if sys.argv[1] and isinstance(sys.argv[1], str):
+    file_path = sys.argv[1]
+else:
+    file_path = "Test Results"
+
 with console.status("Collecting all files..."):
-    all_files = get_files("data")
+    all_files = get_files("Test Results")
 with console.status("Selecting csv files..."):
     csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
 with console.status("Deleting any previous clean data..."):
     delete_clean_files(csv_files)
 with console.status("Collecting all files again..."):
-    all_files = get_files("data")
+    all_files = get_files("Test Results")
 with console.status("Selecting csv files again..."):
     csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
 with console.status("Cleaning data..."):
