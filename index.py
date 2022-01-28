@@ -1,8 +1,5 @@
 import csv
-import inspect
 import os
-import re
-import rich
 import sys
 
 from rich.markdown import Markdown
@@ -124,14 +121,19 @@ if sys.argv[1] and isinstance(sys.argv[1], str):
 else:
     file_path = "Test Results"
 
+# Check if file_path exists
+if not os.path.exists(file_path):
+    console.print("The path \n[white]" + file_path + "[/white]\ndoes not exist.", style="bold red")
+    sys.exit()
+
 with console.status("Collecting all files..."):
-    all_files = get_files("Test Results")
+    all_files = get_files(file_path)
 with console.status("Selecting csv files..."):
     csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
 with console.status("Deleting any previous clean data..."):
     delete_clean_files(csv_files)
 with console.status("Collecting all files again..."):
-    all_files = get_files("Test Results")
+    all_files = get_files(file_path)
 with console.status("Selecting csv files again..."):
     csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
 with console.status("Cleaning data..."):
