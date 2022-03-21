@@ -1,14 +1,19 @@
+from rich.jupyter import print
+from rich.markdown import Markdown
+
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pandas as pd
+import plotly.graph_objects as go
+import re
 import codecs
 import csv
-import os
-import re
 import sys
 
-from rich.markdown import Markdown
 from rich.console import Console
 console = Console()
 
-import pandas as pd
 
 #
 # List data
@@ -110,7 +115,8 @@ def clean_data(files):
             elif "sub" in file:
                 headers = ["Length", "Total Samples", "Samples Per Second", "Average Samples Per Second", "Throughput", "Average Throughput", "Lost Samples", "Lost Samples Percentage"]
             else:
-                print("What file is this?! It ain't got 'pub' or 'sub' in it's name.")
+                # print("What file is this?! It ain't got 'pub' or 'sub' in it's name.")
+                break
 
             clean_output = [headers, clean_numeric_output]
 
@@ -163,6 +169,11 @@ def get_test_folders(root_dir):
 
     return test_folders
 
+def delete_old_run_averages(file_path):
+    for file in get_files(file_path):
+        if 'average' in file:
+            os.remove(file)
+
 def create_run_averages(file_path):
     """
         Reads data from multiple run files, creates an average of each row and concatenates everything (including the data from each run) into a single .csv file. 
@@ -171,29 +182,50 @@ def create_run_averages(file_path):
             run_1_latency   run_2_latency   run_3_latency   avg_run_latency
         0   120             120             120             120
         1   100             200             150             150
-        
+
     """
 
     # Get test folders
     test_folders = get_test_folders(file_path)
 
     for test in test_folders:
-        # For each run read in the latency values
         test_files = get_files(test)
-        latency_files = [file for file in test_files if 'clean_pub_0' in file]
-        
-        data = {}
 
-        for file in latency_files:
-            series = pd.read_csv(file)["Latency"]
-            column = {os.path.basename(os.path.dirname(file)) + "_latency" : series}
-            data.update(column)        
+        with console.status("Creating average run latencies..."):
+            latency_files = [file for file in test_files if 'clean_pub_0' in file]
+            if len(latency_files) > 0:
+                data = {}
+                for file in latency_files:
+                    series = pd.read_csv(file)["Latency"]
+                    column = {os.path.basename(os.path.dirname(file)) + "_latency" : series}
+                    data.update(column)        
 
-        df = pd.DataFrame(data=data)
-        df['avg_run_latency'] = df.mean(numeric_only=True, axis=1)
+                df = pd.DataFrame(data=data)
+                df['avg_run_latency'] = df.mean(numeric_only=True, axis=1)
 
-        # Create new .csv file in test_folder:
-        df.to_csv(os.path.join(test, 'average_latencies.csv'))
+                # Create new .csv file in test_folder:
+                df.to_csv(os.path.join(test, 'average_latencies.csv'))
+
+        with console.status("Creating new average run throughputs..."):
+            throughput_files = [file for file in test_files if 'clean_sub' in file]
+            if len(throughput_files) > 0:
+                sub_files = []
+                for file in throughput_files:
+                    sub_files.append(os.path.basename(file))
+                sub_files = list(set(sub_files))
+                sub_files.sort()
+                
+                for file in sub_files:
+                    data = {}
+                    for tp_file in throughput_files:
+                        if file in tp_file:
+                            series = pd.read_csv(tp_file)["Throughput"]
+                            column = {os.path.basename(os.path.dirname(tp_file)) + "_throughput" : series}
+                            data.update(column)
+                    
+                    df = pd.DataFrame(data=data)
+                    df['avg_run_throughput'] = df.mean(numeric_only=True, axis=1)
+                    df.to_csv(os.path.join(test, file.split("clean_")[1][0:5] + "_average_throughputs.csv"))
 
 if len(sys.argv) > 1 and sys.argv[1] and isinstance(sys.argv[1], str):
     file_path = sys.argv[1]
@@ -219,5 +251,7 @@ with console.status("Selecting csv files again..."):
 clean_data(csv_files)
 with console.status("Verifying files..."):
     verify_files(csv_files)
-with console.status("Creating run average files..."):
-    create_run_averages(file_path)
+with console.status("Deleting old run average files..."):
+    delete_old_run_averages(file_path)
+create_run_averages(file_path)
+console.print("Files cleaned in /[bold white]%s[/bold white]" % file_path, style="bold red")
