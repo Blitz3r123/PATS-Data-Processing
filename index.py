@@ -165,7 +165,13 @@ def get_test_folders(root_dir):
 
 def create_run_averages(file_path):
     """
-        Reads data from multiple run files, creates an average of each row and concatenates everything (including the data from each run) into a single .csv file.
+        Reads data from multiple run files, creates an average of each row and concatenates everything (including the data from each run) into a single .csv file. 
+        Resulting .csv file example:
+        
+            run_1_latency   run_2_latency   run_3_latency   avg_run_latency
+        0   120             120             120             120
+        1   100             200             150             150
+        
     """
 
     # Get test folders
