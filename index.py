@@ -8,6 +8,8 @@ from rich.markdown import Markdown
 from rich.console import Console
 console = Console()
 
+import pandas as pd
+
 #
 # List data
 #
@@ -140,6 +142,53 @@ def verify_files(files):
             if csvreader.line_num > 1 and re.search("[a-zA-Z]", str(row)):
                 console.print("No numeric value found on row " + str(csvreader.line_num) + " in file: \n" + str(file) + ":\n" + str(row) + "\n\n", style="red")
 
+
+def get_test_folders(root_dir):
+    """
+        Gets the list of test folders containing multiple runs.
+
+        Parameters:
+            root_dir (string): root directory of all folders and subfolders
+
+        Returns:
+            test_folders (list): list of all test folders
+
+    """
+    test_folders = []
+    for file in get_files(root_dir):
+        test_folders.append(file.split("run_")[0][0:-1])
+    test_folders = list(set(test_folders))
+    test_folders.sort()
+    test_folders = list(filter(lambda f: '.' not in f, test_folders))
+
+    return test_folders
+
+def create_run_averages(file_path):
+    """
+        Reads data from multiple run files, creates an average of each row and concatenates everything (including the data from each run) into a single .csv file.
+    """
+
+    # Get test folders
+    test_folders = get_test_folders(file_path)
+
+    for test in test_folders:
+        # For each run read in the latency values
+        test_files = get_files(test)
+        latency_files = [file for file in test_files if 'clean_pub_0' in file]
+        
+        data = {}
+
+        for file in latency_files:
+            series = pd.read_csv(file)["Latency"]
+            column = {os.path.basename(os.path.dirname(file)) + "_latency" : series}
+            data.update(column)        
+
+        df = pd.DataFrame(data=data)
+        df['avg_run_latency'] = df.mean(numeric_only=True, axis=1)
+
+        # Create new .csv file in test_folder:
+        df.to_csv(os.path.join(test, 'average_latencies.csv'))
+
 if len(sys.argv) > 1 and sys.argv[1] and isinstance(sys.argv[1], str):
     file_path = sys.argv[1]
 else:
@@ -164,3 +213,5 @@ with console.status("Selecting csv files again..."):
 clean_data(csv_files)
 with console.status("Verifying files..."):
     verify_files(csv_files)
+with console.status("Creating run average files..."):
+    create_run_averages(file_path)
