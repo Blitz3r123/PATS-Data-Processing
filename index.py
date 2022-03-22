@@ -55,11 +55,9 @@ def delete_clean_files(files):
             os.remove(file)
 
 def clean_data(files):
+    console.print("Cleaning %i files..." %len(files), style="green")
     for file in files:
-
         with console.status("Cleaning " + file):
-
-            # console.print(Markdown("# " + file), style="bold white")
 
             # Check for NUL byte in csv:
             if '\0' in open(file).read():
@@ -137,7 +135,7 @@ def clean_data(files):
                     writer.writerows(clean_numeric_output)
 
 def verify_files(files):
-    for file in [file for file in files if "clean" in file]:
+    for file in [file for file in files if "clean_" in file]:
         if '\0' in open(file).read():
             # print("NUL bytes found in \n" +file+ " \n")
             csvreader = csv.reader(x.replace('\0', '') for x in open(file))
@@ -174,6 +172,17 @@ def delete_old_run_averages(file_path):
         if 'average' in file:
             os.remove(file)
 
+def clean_files_exist(file_path):
+    files = get_files(file_path)
+    clean_files = [file for file in files if 'clean_' in file]
+    if len(clean_files) > 0:
+        return True
+    else:
+        return False
+
+def average_files_exist(file_path):
+    return len([file for file in get_files(file_path) if 'average' in file]) > 0
+
 def create_run_averages(file_path):
     """
         Reads data from multiple run files, creates an average of each row and concatenates everything (including the data from each run) into a single .csv file. 
@@ -191,23 +200,34 @@ def create_run_averages(file_path):
     for test in test_folders:
         test_files = get_files(test)
 
-        with console.status("Creating average run latencies..."):
-            latency_files = [file for file in test_files if 'clean_pub_0' in file]
+        with console.status("Creating average run latencies for [green]%s[/green]" %test):
+            latency_files = [file for file in test_files if 'clean_' in file and 'pub_0' in file]
             if len(latency_files) > 0:
                 data = {}
                 for file in latency_files:
+                    col_title = os.path.basename(os.path.dirname(file))
+                    if 'mal' in file:
+                        col_title = col_title + "_mal_latency"
+                    else:
+                        col_title = col_title + "_latency"
                     series = pd.read_csv(file)["Latency"]
-                    column = {os.path.basename(os.path.dirname(file)) + "_latency" : series}
+                    column = {col_title : series}
                     data.update(column)        
 
                 df = pd.DataFrame(data=data)
+                non_mal_cols = [col for col in df.columns if 'mal' not in col]
+                mal_cols = [col for col in df.columns if 'mal' in col]
+                df['avg_non_mal_run_latency'] = df[non_mal_cols].mean(numeric_only=True, axis=1)
+                df['avg_mal_run_latency'] = df[mal_cols].mean(numeric_only=True, axis=1)
                 df['avg_run_latency'] = df.mean(numeric_only=True, axis=1)
 
                 # Create new .csv file in test_folder:
                 df.to_csv(os.path.join(test, 'average_latencies.csv'))
+            # else:
+                # console.print("No latency files found for %s" % test, style="red")
 
         with console.status("Creating new average run throughputs..."):
-            throughput_files = [file for file in test_files if 'clean_sub' in file]
+            throughput_files = [file for file in test_files if 'clean' in file and 'sub' in file]
             if len(throughput_files) > 0:
                 sub_files = []
                 for file in throughput_files:
@@ -225,7 +245,14 @@ def create_run_averages(file_path):
                     
                     df = pd.DataFrame(data=data)
                     df['avg_run_throughput'] = df.mean(numeric_only=True, axis=1)
-                    df.to_csv(os.path.join(test, file.split("clean_")[1][0:5] + "_average_throughputs.csv"))
+                    if 'mal' in file:
+                        filename = os.path.join(test, file.split("clean_")[1].replace(".csv", "").replace("output_", "") + "_average_throughputs.csv")
+                    else:
+                        filename = os.path.join(test, file.split("clean_")[1].replace(".csv", "").replace("output_", "") + "_average_throughputs.csv")
+                    # print(filename)
+                    df.to_csv(filename)
+            # else:
+                # console.print("No throughput files found for %s" % test, style="red")
 
 if len(sys.argv) > 1 and sys.argv[1] and isinstance(sys.argv[1], str):
     file_path = sys.argv[1]
@@ -235,23 +262,42 @@ else:
 
 # Check if file_path exists
 if not os.path.exists(file_path):
-    console.print("The path \n[white]" + file_path + "[/white]\ndoes not exist.", style="bold red")
+    console.print("❎ The path \n[white]" + file_path + "[/white]\ndoes not exist.", style="bold red")
     sys.exit()
 
 with console.status("Collecting all files..."):
     all_files = get_files(file_path)
-with console.status("Selecting csv files..."):
-    csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
-with console.status("Deleting any previous clean data..."):
-    delete_clean_files(csv_files)
-with console.status("Collecting all files again..."):
-    all_files = get_files(file_path)
-with console.status("Selecting csv files again..."):
-    csv_files = list(filter(lambda file: file.endswith(".csv"), all_files))
+    console.print('Collected all files...', style="green")
+with console.status("✅ Selecting csv files..."):
+    csv_files = [file for file in all_files if '.csv' in file]
+    console.print('✅ Collected all csv files...', style="green")
+
+if clean_files_exist(file_path):
+    with console.status("Deleting any previous clean data..."):
+        delete_clean_files(csv_files)
+        console.print("✅ Previous clean files deleted...", style="green")
+        csv_files = [file for file in all_files if '.csv' in file]
+else:
+    with console.status("Collecting all files again..."):
+        all_files = get_files(file_path)
+        console.print('✅ Collected all files...', style="green")
+    with console.status("Selecting csv files again..."):
+        csv_files = [file for file in all_files if '.csv' in file]
+        console.print('✅ Collected all csv files...', style="green")
+
 clean_data(csv_files)
+console.print('✅ Cleaned all csv files...', style="green")
+
 with console.status("Verifying files..."):
     verify_files(csv_files)
-with console.status("Deleting old run average files..."):
-    delete_old_run_averages(file_path)
-create_run_averages(file_path)
-console.print("Files cleaned in /[bold white]%s[/bold white]" % file_path, style="bold red")
+    console.print('✅ Verified files...', style="green")
+
+if average_files_exist(file_path):
+    with console.status("Deleting old run average files..."):
+        delete_old_run_averages(file_path)
+
+if clean_files_exist(file_path):
+    create_run_averages(file_path)
+    console.print("✅ Files cleaned in /[bold white]%s[/bold white]" % file_path, style="bold green")
+else:
+    console.print("❎ Something went wrong...I did all this work...and clean files don't exist....", style="bold red")
