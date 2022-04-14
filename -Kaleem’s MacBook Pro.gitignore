@@ -1,0 +1,14 @@
+/data
+./data
+*.ipynb
+./*.ipynb
+.ipynb_checkpoints
+./.ipynb_checkpoints
+/Test Results
+./Test Results
+.vscode/
+__pycache__/
+node_modules/
+package-lock.json
+package.json
+.DS_Store

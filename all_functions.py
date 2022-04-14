@@ -105,6 +105,9 @@ def get_test_names(file_paths):
             elif '_3_' in file:
                 pub_count = 50
                 sub_count = 50
+            elif '_5_' in file or '75_participants' in file:
+                pub_count = 75
+                sub_count = 75
             else:
                 pub_count = 100
                 sub_count = 100
@@ -419,3 +422,210 @@ def plot_cdf(title, df, ax, color, type):
         cdf.plot(ax = ax, label=title, color=color, ls="--")
     else:
         cdf.plot(ax = ax, label=title, color=color)
+
+def set2_plot_latency_cdfs():
+    set2_avgs = [file for file in get_files("data/set_2") if 'average' in file and 'forced_transport' in file]
+    set2_lats = [file for file in set2_avgs if 'latencies' in file]
+
+    ucast_lats = [file for file in set2_lats if 'unicast' in file]
+    mcast_lats = [file for file in set2_lats if 'multicast' in file]
+    mcast_lats.append(mcast_lats.pop(0))
+    
+    fig, ax = plt.subplots(figsize=(25, 10))
+
+    lats = {
+        "ucast_names": get_test_names(ucast_lats),
+        "ucast_files": ucast_lats,
+        "mcast_names": get_test_names(mcast_lats),
+        "mcast_files": mcast_lats
+    }
+
+    for i in range(len(lats["ucast_files"])):
+        if i < len(lats["ucast_files"]):
+            # print(i)
+            # print(lats["ucast_names"][i])
+            if "100P" not in lats["ucast_names"][i]:
+                df = pd.read_csv(lats["ucast_files"][i])
+                try:
+                    combined_df = pd.concat([ df['run_1_latency'], df['run_2_latency'], df['run_3_latency'] ])
+                    plot_cdf( lats["ucast_names"][i] , combined_df, ax, greens[0], 'average')
+                except:
+                    print("Didn't work for " + lats["ucast_names"][i])
+
+            if "100P" not in lats["mcast_names"][i]:
+                df = pd.read_csv(lats["mcast_files"][i])
+                try:
+                    combined_df = pd.concat([ df['run_1_latency'], df['run_2_latency'], df['run_3_latency'] ])
+                    plot_cdf( lats["mcast_names"][i] , combined_df, ax, reds[0], 'average')
+                except:
+                    print("Didn't work for " + lats["mcast_names"][i])
+    
+    ax.set_xlim(xmin=0, xmax=300000)
+    ax.set_ylim(ymin=0, ymax=1)
+    ax.set_xlabel("Latency ($\mu$s)")
+    ax.set_xticks(list(ax.get_xticks()) + [8000, ])
+    # ax.set_yticks(list(ax.get_yticks()) + [.25, .5, .75])
+    ax.text(8000, 0.9, "10P/10S", color="black", backgroundcolor=greens[6], fontsize=12)
+    ax.text(30000, 0.5, "25P/25S", color="black", backgroundcolor=greens[6], fontsize=12)
+    ax.text(85000, 0.53, "50P/50S", color="black", backgroundcolor=greens[6], fontsize=12)
+    ax.text(140000, 0.3, "75P/75S", color="black", backgroundcolor=greens[6], fontsize=12)
+    ax.grid()
+    ax.legend()
+
+    fig.suptitle("Latency CDFs (Unicast vs Multicast for Increasing Participants)", fontsize=15, fontweight='bold')
+
+    plt.tight_layout()
+
+def set2_plot_latency_cdfs_per_participant():
+
+    fig, axes = plt.subplots(nrows=4, ncols=1, figsize=(35, 60))
+    fig.suptitle("Latency CDFs Per Participant (Unicast vs Multicast)", fontsize=20, fontweight='bold')
+
+    s2_lats = [file for file in get_files('data/set_2') if 'average_latencies' in file and '_4_' not in file and 'forced_transport' in file]
+
+    s2_ucast_lats = [file for file in s2_lats if 'unicast' in file]
+
+    for file in s2_ucast_lats:
+        i = s2_ucast_lats.index(file)
+        df = pd.read_csv(file)
+        combined_df = pd.concat([df['run_1_latency'], df['run_2_latency'], df['run_3_latency']])
+        ax = axes[i]
+        
+        ax.set_ylim(ymin=0)
+        ax.set_xlabel("Latency ($\mu$s)")
+
+        if i == 0:
+            ax.set_xlim(xmin=0, xmax=15000)
+            ax.set_title("10P + 10S", fontsize=15, fontweight='bold')
+        elif i == 1:
+            ax.set_xlim(xmin=0, xmax=100000)
+            ax.set_title("25P + 25S", fontsize=15, fontweight='bold')
+        elif i == 2:
+            ax.set_xlim(xmin=0, xmax=300000)
+            ax.set_title("50P + 50S", fontsize=15, fontweight='bold')
+        elif i == 3:
+            ax.set_xlim(xmin=0, xmax=600000)
+            ax.set_title("75P + 75S", fontsize=15, fontweight='bold')
+
+        plot_cdf("", df['run_1_latency'], ax, greens[0], 'normal')
+        plot_cdf("", df['run_2_latency'], ax, greens[0], 'normal')
+        plot_cdf("", df['run_3_latency'], ax, greens[0], 'normal')
+        plot_cdf(get_test_names([file])[0] + " Average", combined_df, ax, greens[0], 'average')
+
+    s2_mcast_lats = [file for file in s2_lats if 'multicast' in file]
+    s2_mcast_lats.append(s2_mcast_lats.pop(0))
+
+    for file in s2_mcast_lats:
+        i = s2_mcast_lats.index(file)
+        df = pd.read_csv(file)
+        combined_df = pd.concat([df['run_1_latency'], df['run_2_latency'], df['run_3_latency']])
+        ax = axes[i]
+        
+        ax.set_ylim(ymin=0)
+        ax.set_xlabel("Latency ($\mu$s)")
+
+        if i == 0:
+            ax.set_xlim(xmin=0, xmax=15000)
+            # ax.set_title("10P + 10S (Multicast)", fontsize=15, fontweight='bold', color=reds[0])
+        elif i == 1:
+            ax.set_xlim(xmin=0, xmax=120000)
+            # ax.set_title("25P + 25S (Multicast)", fontsize=15, fontweight='bold', color=reds[0])
+        elif i == 2:
+            ax.set_xlim(xmin=0, xmax=400000)
+            # ax.set_title("50P + 50S (Multicast)", fontsize=15, fontweight='bold', color=reds[0])
+        elif i == 3:
+            ax.set_xlim(xmin=0, xmax=600000)
+            # ax.set_title("75P + 75S", fontsize=15, fontweight='bold')
+
+        plot_cdf("", df['run_1_latency'], ax, reds[0], 'normal')
+        plot_cdf("", df['run_2_latency'], ax, reds[0], 'normal')
+        plot_cdf("", df['run_3_latency'], ax, reds[0], 'normal')
+        plot_cdf(get_test_names([file])[0] + " Average", combined_df, ax, reds[0], 'average')
+
+    for ax in axes:
+        ax.grid()
+        ax.legend(loc=2)
+
+    plt.tight_layout(pad=3)
+
+def set2_plot_tp_cdfs():
+    set2_tps = [file for file in get_files('data/set_2') if 'average_throughput' in file and '_4_' not in file and 'forced_transport' in file]
+
+    ucast_tps = [file for file in set2_tps if 'unicast' in file]
+    mcast_tps = [file for file in set2_tps if 'multicast' in file]
+
+    fig, ax = plt.subplots(figsize=(25, 10))
+
+    tps = {
+        "ucast_names": get_test_names(ucast_tps),
+        "ucast_files": ucast_tps,
+        "mcast_names": get_test_names(mcast_tps),
+        "mcast_files": mcast_tps
+    }
+
+    greens.reverse()
+    reds.reverse()
+
+    for i in range(len(tps["ucast_names"])):
+        ucast_file = tps["ucast_files"][i]
+        ucast_name = tps["ucast_names"][i]
+        
+        df = pd.read_csv(ucast_file)
+        try:
+            combined_df = pd.concat( [ df["run_1_throughput"], df["run_2_throughput"], df["run_3_throughput"] ] )
+            if "10P" in ucast_name:
+                if 'sub_0' in ucast_file:
+                    label = "10P + 10S"
+                else:
+                    label = ""
+                plot_cdf(label, combined_df, ax, greens[0], 'average')
+            elif "25P" in ucast_name:
+                if 'sub_0' in ucast_file:
+                    label = "25P + 25S"
+                else:
+                    label = ""
+                plot_cdf(label, combined_df, ax, greens[3], 'average')
+            elif "50P" in ucast_name:
+                if 'sub_0' in ucast_file:
+                    label = "50P + 50S"
+                else:
+                    label = ""
+                plot_cdf(label, combined_df, ax, greens[6], 'average')
+        except:
+            None
+
+        mcast_file = tps["mcast_files"][i]
+        mcast_name = tps["mcast_names"][i]
+        df = pd.read_csv(mcast_file)["avg_run_throughput"]
+        if "10P" in mcast_name:
+            if 'sub_0' in mcast_file:
+                label = "10P + 10S"
+            else:
+                label = ""
+            plot_cdf(label, df, ax, reds[0], 'average')
+        elif "25P" in mcast_name:
+            if 'sub_0' in mcast_file:
+                label = "25P + 25S"
+            else:
+                label = ""
+            plot_cdf(label, df, ax, reds[3], 'average')
+        elif "50P" in mcast_name:
+            if 'sub_0' in mcast_file:
+                label = "50P + 50S"
+            else:
+                label = ""
+            plot_cdf(label, df, ax, reds[6], 'average')
+
+    greens.reverse()
+    reds.reverse()
+
+    ax.set_ylim(ymin=0)
+    ax.set_xlim(xmin=0, xmax=32.5)
+    ax.set_xlabel("Throughput (mbps)")
+    ax.set_xticks( list(ax.get_xticks()) + [2, ] )
+    ax.legend()
+    ax.grid()
+
+    fig.suptitle("Throughput CDFs (Unicast vs Multicast for Increasing Participants)", fontsize=15, fontweight='bold')
+
+    plt.tight_layout()
