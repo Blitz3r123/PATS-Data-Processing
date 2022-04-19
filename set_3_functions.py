@@ -87,7 +87,7 @@ def plot_attack(ax, files, title):
         ax.legend()
         ax.grid()
 
-def plot_table(titles, columns):
+def s3_plot_table(titles, columns):
     row_even_colour = '#d0d8e0'
     row_odd_colour = 'white'
 
