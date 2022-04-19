@@ -238,6 +238,8 @@ def parse_data_lens(data, format):
     for item in data:
         if 'K' in item:
             value = get_double(item[:-2]) * 1000
+        elif 'M' in item:
+            value = get_double(item[:-2]) * 1000000
         elif 'b' in item:
             value = get_double(item[:-1])
 
@@ -279,19 +281,25 @@ def get_network_data(file, format):
         for line in f.readlines():
             if 'Total send rate' in line:
                 split_line = line.split(" ")
-                send_rate = [word for word in split_line if len(word) > 0][3]
+                try:
+                    send_rate = [word for word in split_line if len(word) > 0][3]
+                except:
+                    None
                 data['send_rates'].append(send_rate)
             elif 'Total receive rate' in line:
                 split_line = line.split(" ")
                 receive_rate = [word for word in split_line if len(word) > 0][3]
                 data['receive_rates'].append(receive_rate)
 
-    if format is not None:
-        data['send_rates'] = parse_data_lens(data['send_rates'], format)
-        data['receive_rates'] = parse_data_lens(data['receive_rates'], format)
-    else:
-        data['send_rates'] = parse_data_lens(data['send_rates'], None)
-        data['receive_rates'] = parse_data_lens(data['receive_rates'], None)
+    try:
+        if format is not None:
+            data['send_rates'] = parse_data_lens(data['send_rates'], format)
+            data['receive_rates'] = parse_data_lens(data['receive_rates'], format)
+        else:
+            data['send_rates'] = parse_data_lens(data['send_rates'], None)
+            data['receive_rates'] = parse_data_lens(data['receive_rates'], None)
+    except:
+        None
     
     return data
 
