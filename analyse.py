@@ -109,7 +109,7 @@ def get_configs(test_folders, config_files, data):
 def get_data_runs(test_folders):
     return [len([file for file in os.listdir(file) if '.csv' not in file and 'run_' in file]) for file in test_folders]
 
-def get_config_runs(data):
+def get_config_runs_and_participants(data):
     for file in data['config_files']:
         if len(file) > 0:
             with open(file.replace("[green]", "").replace("[/green]", ""), "r") as f:
@@ -192,7 +192,7 @@ def main():
     data['test_names'] = new_file_names
     data['data_runs'] = get_data_runs(test_folders)
 
-    get_config_runs(data)
+    get_config_runs_and_participants(data)
             
     """
     Calculate participant amount per run
