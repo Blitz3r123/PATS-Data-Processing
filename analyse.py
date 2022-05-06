@@ -153,50 +153,7 @@ def get_config_runs_and_participants(data):
 
         data["errors"].append("")
 
-def main():
-    """
-    1. List tests in a table format
-    2. Check how many runs were stated in the config
-    3. Get sub, malsub, pub, and malpub count
-    4. Get number of run folders
-    5. Get participant amounts per run
-    """
-
-    data = {
-        "test_files": [],
-        "test_names": [],
-        "has_config": [],
-        "config_files": [],
-        "config_runs": [],
-        "data_runs": [],
-        "sub_count": [],
-        "mal_sub_count": [],
-        "pub_count": [],
-        "mal_pub_count": [],
-        "run_participants": [], 
-        "errors": []
-    }
-
-    test_folders = get_test_folders()
-    
-    new_file_names = format_test_titles(test_folders)
-
-    # Sort both in the same order
-    new_file_names, test_folders = zip(*sorted(zip(new_file_names, test_folders)))
-
-    config_files = [file for file in get_files(file_path) if '.txt' in file]
-
-    get_configs(test_folders, config_files, data)
-
-    data['test_files'] = test_folders
-    data['test_names'] = new_file_names
-    data['data_runs'] = get_data_runs(test_folders)
-
-    get_config_runs_and_participants(data)
-            
-    """
-    Calculate participant amount per run
-    """
+def get_run_participants(data):
     for i in range(len(data['test_files'])):
         runs_arr = []
         filename = data['test_files'][i]
@@ -240,6 +197,51 @@ def main():
                 }
 
         data['run_participants'].append(runs_arr)
+
+def main():
+    """
+    1. List tests in a table format
+    2. Check how many runs were stated in the config
+    3. Get sub, malsub, pub, and malpub count
+    4. Get number of run folders
+    5. Get participant amounts per run
+    """
+
+    data = {
+        "test_files": [],
+        "test_names": [],
+        "has_config": [],
+        "config_files": [],
+        "config_runs": [],
+        "data_runs": [],
+        "sub_count": [],
+        "mal_sub_count": [],
+        "pub_count": [],
+        "mal_pub_count": [],
+        "run_participants": [], 
+        "errors": []
+    }
+
+    test_folders = get_test_folders()
+    
+    new_file_names = format_test_titles(test_folders)
+
+    # Sort both in the same order
+    new_file_names, test_folders = zip(*sorted(zip(new_file_names, test_folders)))
+
+    config_files = [file for file in get_files(file_path) if '.txt' in file]
+
+    get_configs(test_folders, config_files, data)
+
+    data['test_files'] = test_folders
+    
+    data['test_names'] = new_file_names
+    
+    data['data_runs'] = get_data_runs(test_folders)
+
+    get_config_runs_and_participants(data)
+
+    get_run_participants(data)
 
     """
     Identify all errors and add to data['errors'].
