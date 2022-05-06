@@ -11,3 +11,5 @@ node_modules/
 package-lock.json
 package.json
 analysis.html
+./analysis.html
+/analysis.html

@@ -121,15 +121,12 @@ def main():
 
     for file in files:
         if file + "_metadata.txt" in config_files:
-            data['has_config'].append("[green]Yes[/green]")
-            data["config_files"].append("[green]" + file + "_metadata.txt[/green]")
+            data['has_config'].append(True)
+            data["config_files"].append(file + "_metadata.txt")
         else:
-            data['has_config'].append("-")
+            data['has_config'].append(False)
             data["config_files"].append("")
 
-    """
-    Populate single data structure with all info
-    """
     for file in files:
         data["test_files"].append(file)
     for new_file_name in new_file_names:
@@ -262,7 +259,7 @@ def main():
     for i in range(len(data['test_files'])):
         error = ""
         # 1. Config not found.
-        if "-" in data["has_config"][i]:
+        if data["has_config"][i] == False:
             error = "Config file not found."
         else:
             # 2. 0 runs.
@@ -326,6 +323,7 @@ def main():
 
         test_name = data['test_names'][i]
         has_config = data["has_config"][i]
+        has_config = "[green]Yes[/green]" if has_config else "-"
 
         if error == "":
             # test_file = data['test_files'][i]
@@ -416,6 +414,7 @@ def main():
     console.print(table)
     # console.print(data)
 
+    # Output to analysis.html too
     with open("analysis.html", "w", encoding='utf-8') as f:
         f.write(console.export_html())
 
