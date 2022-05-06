@@ -71,6 +71,16 @@ def beat(length: int = 1) -> None:
     yield
     time.sleep(length * 0.04)
 
+def get_test_folders():
+    test_folders = []
+    all_files = os.listdir(file_path)
+    for file in all_files:
+        full_path = os.path.join(file_path, file)
+        if os.path.isdir(full_path):
+            test_folders.append(full_path)
+    test_folders.sort()
+    return test_folders
+
 def main():
     """
     1. List tests in a table format
@@ -95,18 +105,11 @@ def main():
         "errors": []
     }
 
-    # Get list of files
-    files = []
-    all_files = os.listdir(file_path)
-    for file in all_files:
-        full_path = os.path.join(file_path, file)
-        if os.path.isdir(full_path):
-            files.append(full_path)
-    files.sort()
+    test_folders = get_test_folders()
 
     # Format file names into titles
     new_file_names = []
-    for file in files:
+    for file in test_folders:
         if len(file.split("_")[2]) == 1:
             split_name = file.split("_")
             split_name[1] = "0" + split_name[1]
@@ -115,11 +118,11 @@ def main():
             new_file_names.append(file.replace("_", " ").replace("\\", " ").replace("/", " ").replace("data ", "").title())
 
     # Sort both in the same order
-    new_file_names, files = zip(*sorted(zip(new_file_names, files)))
+    new_file_names, test_folders = zip(*sorted(zip(new_file_names, test_folders)))
 
     config_files = [file for file in get_files(file_path) if '.txt' in file]
 
-    for file in files:
+    for file in test_folders:
         if file + "_metadata.txt" in config_files:
             data['has_config'].append(True)
             data["config_files"].append(file + "_metadata.txt")
@@ -127,7 +130,7 @@ def main():
             data['has_config'].append(False)
             data["config_files"].append("")
 
-    for file in files:
+    for file in test_folders:
         data["test_files"].append(file)
     for new_file_name in new_file_names:
         data["test_names"].append(new_file_name)
@@ -411,7 +414,7 @@ def main():
                 table.add_column("Comments", no_wrap=False)
             table.add_row(test_name, has_config, runs, run_folder_count, participants, participants_data, comments, style="bold #003f5c on #ffa600")
 
-    console.print(table)
+    # console.print(table)
     # console.print(data)
 
     # Output to analysis.html too
