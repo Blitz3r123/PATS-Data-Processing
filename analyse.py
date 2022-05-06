@@ -66,11 +66,6 @@ with console.status("Checking given file path..."):
         console.print("❎ The path \n[white]" + file_path + "[/white]\ndoes not exist.", style="bold red")
         sys.exit()
 
-@contextmanager
-def beat(length: int = 1) -> None:
-    yield
-    time.sleep(length * 0.04)
-
 def get_test_folders():
     test_folders = []
     all_files = os.listdir(file_path)
