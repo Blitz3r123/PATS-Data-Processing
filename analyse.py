@@ -141,10 +141,8 @@ def main():
 
     get_configs(test_folders, config_files, data)
 
-    for file in test_folders:
-        data["test_files"].append(file)
-    for new_file_name in new_file_names:
-        data["test_names"].append(new_file_name)
+    data['test_files'] = test_folders
+    data['test_names'] = new_file_names
 
     """
     Calculate how many run_n folders there are
