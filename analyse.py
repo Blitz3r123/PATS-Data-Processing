@@ -81,6 +81,22 @@ def get_test_folders():
     test_folders.sort()
     return test_folders
 
+def format_test_titles(test_folders):
+    new_file_names = []
+
+    for file in test_folders:
+        new_file_name = file.split("\\")[1]
+        split_new_file_name = new_file_name.split("_")
+        has_single_digit = len(split_new_file_name[1]) == 1
+        
+        if has_single_digit:
+            split_new_file_name[1] = "0" + split_new_file_name[1]
+            new_file_names.append((" ").join(split_new_file_name).replace("\\", " ").replace("/", " ").replace("data ", "").title())    
+        else:
+            new_file_names.append(new_file_name.replace("_", " ").replace("\\", " ").replace("/", " ").replace("data ", "").title())
+            
+    return new_file_names
+
 def main():
     """
     1. List tests in a table format
@@ -107,15 +123,8 @@ def main():
 
     test_folders = get_test_folders()
 
-    # Format file names into titles
-    new_file_names = []
-    for file in test_folders:
-        if len(file.split("_")[2]) == 1:
-            split_name = file.split("_")
-            split_name[1] = "0" + split_name[1]
-            new_file_names.append((" ").join(split_name).replace("\\", " ").replace("/", " ").replace("data ", "").title())
-        else:
-            new_file_names.append(file.replace("_", " ").replace("\\", " ").replace("/", " ").replace("data ", "").title())
+    new_file_names = format_test_titles(test_folders)
+    print(new_file_names)
 
     # Sort both in the same order
     new_file_names, test_folders = zip(*sorted(zip(new_file_names, test_folders)))
