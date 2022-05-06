@@ -109,48 +109,7 @@ def get_configs(test_folders, config_files, data):
 def get_data_runs(test_folders):
     return [len([file for file in os.listdir(file) if '.csv' not in file and 'run_' in file]) for file in test_folders]
 
-def main():
-    """
-    1. List tests in a table format
-    2. Check how many runs were stated in the config
-    3. Get sub, malsub, pub, and malpub count
-    4. Get number of run folders
-    5. Get participant amounts per run
-    """
-
-    data = {
-        "test_files": [],
-        "test_names": [],
-        "has_config": [],
-        "config_files": [],
-        "config_runs": [],
-        "data_runs": [],
-        "sub_count": [],
-        "mal_sub_count": [],
-        "pub_count": [],
-        "mal_pub_count": [],
-        "run_participants": [], 
-        "errors": []
-    }
-
-    test_folders = get_test_folders()
-    
-    new_file_names = format_test_titles(test_folders)
-
-    # Sort both in the same order
-    new_file_names, test_folders = zip(*sorted(zip(new_file_names, test_folders)))
-
-    config_files = [file for file in get_files(file_path) if '.txt' in file]
-
-    get_configs(test_folders, config_files, data)
-
-    data['test_files'] = test_folders
-    data['test_names'] = new_file_names
-    data['data_runs'] = get_data_runs(test_folders)
-
-    """
-    Calculate how many runs were configured
-    """
+def get_config_runs(data):
     for file in data['config_files']:
         if len(file) > 0:
             with open(file.replace("[green]", "").replace("[/green]", ""), "r") as f:
@@ -193,6 +152,47 @@ def main():
             data['mal_sub_count'].append(0)
 
         data["errors"].append("")
+
+def main():
+    """
+    1. List tests in a table format
+    2. Check how many runs were stated in the config
+    3. Get sub, malsub, pub, and malpub count
+    4. Get number of run folders
+    5. Get participant amounts per run
+    """
+
+    data = {
+        "test_files": [],
+        "test_names": [],
+        "has_config": [],
+        "config_files": [],
+        "config_runs": [],
+        "data_runs": [],
+        "sub_count": [],
+        "mal_sub_count": [],
+        "pub_count": [],
+        "mal_pub_count": [],
+        "run_participants": [], 
+        "errors": []
+    }
+
+    test_folders = get_test_folders()
+    
+    new_file_names = format_test_titles(test_folders)
+
+    # Sort both in the same order
+    new_file_names, test_folders = zip(*sorted(zip(new_file_names, test_folders)))
+
+    config_files = [file for file in get_files(file_path) if '.txt' in file]
+
+    get_configs(test_folders, config_files, data)
+
+    data['test_files'] = test_folders
+    data['test_names'] = new_file_names
+    data['data_runs'] = get_data_runs(test_folders)
+
+    get_config_runs(data)
             
     """
     Calculate participant amount per run
