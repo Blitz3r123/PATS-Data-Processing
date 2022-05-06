@@ -94,8 +94,17 @@ def format_test_titles(test_folders):
             new_file_names.append((" ").join(split_new_file_name).replace("\\", " ").replace("/", " ").replace("data ", "").title())    
         else:
             new_file_names.append(new_file_name.replace("_", " ").replace("\\", " ").replace("/", " ").replace("data ", "").title())
-            
+
     return new_file_names
+
+def get_configs(test_folders, config_files, data):
+    for file in test_folders:
+        if file + "_metadata.txt" in config_files:
+            data['has_config'].append(True)
+            data["config_files"].append(file + "_metadata.txt")
+        else:
+            data['has_config'].append(False)
+            data["config_files"].append("")
 
 def main():
     """
@@ -122,28 +131,20 @@ def main():
     }
 
     test_folders = get_test_folders()
-
+    
     new_file_names = format_test_titles(test_folders)
-    print(new_file_names)
 
     # Sort both in the same order
     new_file_names, test_folders = zip(*sorted(zip(new_file_names, test_folders)))
 
     config_files = [file for file in get_files(file_path) if '.txt' in file]
 
-    for file in test_folders:
-        if file + "_metadata.txt" in config_files:
-            data['has_config'].append(True)
-            data["config_files"].append(file + "_metadata.txt")
-        else:
-            data['has_config'].append(False)
-            data["config_files"].append("")
+    get_configs(test_folders, config_files, data)
 
     for file in test_folders:
         data["test_files"].append(file)
     for new_file_name in new_file_names:
         data["test_names"].append(new_file_name)
-
 
     """
     Calculate how many run_n folders there are
