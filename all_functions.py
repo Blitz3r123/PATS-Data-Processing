@@ -11,6 +11,7 @@ import re
 from statistics import *
 
 from matplotlib.pyplot import figure
+from matplotlib.lines import Line2D
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -261,6 +262,23 @@ def parse_data_lens(data, format):
 
         return new_data
 
+def interpolate_network_data(input):
+    """
+      Interpolates the network data to produce values every second rather than every two seconds.
+    
+      Parameters:
+        input ([int]): Array of values.
+    
+      Returns:
+        output ([int]): Array of interpolated values. 
+    """
+    input = pd.Series(input)                                        # Convert to pandas series
+    output = input.to_numpy()                                       # Convert to numpy array
+    output = np.insert(output, np.arange(1, len(output), 1), 0)     # Insert 0 after every second item
+    output = np.where(output == 0, np.NaN, output)                  # Replace 0 with NaN
+    output = pd.Series(output).interpolate()                        # Interpolate values of NaN
+    return output
+
 def get_network_data(file, format):
     """
       Get the send and receive rates from an output file of the iftop command and parse data into required `format`.
@@ -300,7 +318,10 @@ def get_network_data(file, format):
             data['receive_rates'] = parse_data_lens(data['receive_rates'], None)
     except:
         None
-    
+
+    data['send_rates'] = interpolate_network_data(data['send_rates'])
+    data['receive_rates'] = interpolate_network_data(data['receive_rates'])
+
     return data
 
 def plot_table(ax, headings, rows):
@@ -325,6 +346,71 @@ def plot_table(ax, headings, rows):
         loc='center', 
         colLoc='center',
         cellLoc='center')
+
+def plot_lat_summary_table(latency_files):
+    """
+      Creates metric summary tables for latency files.append
+    
+      Parameters:
+        latency_files ([files]): Array of file paths of latency files.
+    
+      Returns:
+        None 
+    """
+    for file in latency_files:
+        fig, ax = plt.subplots()
+
+        df = pd.read_csv(file)
+
+        stats = {
+            "counts": [],
+            "means": [],
+            "stds": [],
+            "mins": [],
+            "25s": [],
+            "50s": [],
+            "75s": [],
+            "maxs": []
+        }
+
+        for col in df.columns[1:4]:
+            stats["counts"].append(format_number(df[col].count()))
+            stats["means"].append(format_number(df[col].mean()))
+            stats["stds"].append(format_number(df[col].std()))
+            stats["mins"].append(format_number(df[col].min()))
+            stats["25s"].append(format_number(df[col].quantile(.25)))
+            stats["50s"].append(format_number(df[col].quantile(.5)))
+            stats["75s"].append(format_number(df[col].quantile(.75)))
+            stats["maxs"].append(format_number(df[col].max()))
+
+        cellColour = [
+            greens[0],
+            oranges[0],
+            reds[0]
+        ]
+
+        cellColours = [cellColour, cellColour, cellColour, cellColour, cellColour, cellColour, cellColour, cellColour, cellColour]
+
+        table = ax.table(
+            cellText=[ ["Run 1", "Run 2", "Run 3"], stats["counts"], stats["means"], stats["stds"], stats["mins"], stats["25s"], stats["50s"], stats["75s"], stats["maxs"],],
+            cellColours = cellColours,
+            cellLoc='center',
+            rowLabels=["Run", "Count", "Mean", "Standard Deviation", "Min.", "25%", "50%", "75%", "Max"],
+            rowLoc='center',
+            colLabels=["", get_test_names([file])[0] + " Latency Summary", ""],
+            colLoc='center',
+            loc='center',
+            
+        )
+
+        table.scale(1, 2)
+        table.auto_set_font_size(False)
+        table.set_fontsize(15)
+        table.auto_set_column_width(range(len(stats)))
+        ax.axis("off")
+        _ = ax.axis("tight")
+        
+        fig.patch.set_visible(False)
 
 def plot_plotly_table(titles, columns):
     """
@@ -897,3 +983,2049 @@ def s2_rerun_plot_latency_variation_per_participant():
         _ = ax.legend()
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
+
+def s2_rerun_latency_cdf_vs_network_usage():
+    lats = [file for file in get_files("data/set_2") if 'average_latencies' in file and ('network' in file or '75_participant' in file)]
+    ucast_lats = [file for file in lats if 'unicast' in file]
+    mcast_lats = [file for file in lats if 'multicast' in file]
+    mcast_lats = mcast_lats[1:] + [mcast_lats[0]]
+
+    net_logs = [file for file in get_files("data/set_2") if 'network_usage' in file and ('network' in file or '75_participant' in file)]
+    net_logs.sort()
+    net_logs = net_logs[12:] + [net_logs[:12]]
+    ucast_logs = [file for file in net_logs if 'unicast' in file]
+    mcast_logs = [file for file in net_logs if 'multicast' in file]
+
+    fig = plt.figure(figsize=(30, 60))
+    grid = plt.GridSpec(8, 2, figure=fig, hspace=0.25, wspace=0.1)
+
+    left_ax = {
+        "0": plt.subplot(grid[0:2, 0]),
+        "1": plt.subplot(grid[2:4, 0]),
+        "2": plt.subplot(grid[4:6, 0]),
+        "3": plt.subplot(grid[6:8, 0])
+    }
+
+    right_ax = {
+        "0": plt.subplot(grid[0, 1]),
+        "1": plt.subplot(grid[1, 1]),
+        "2": plt.subplot(grid[2, 1]),
+        "3": plt.subplot(grid[3, 1]),
+        "4": plt.subplot(grid[4, 1]),
+        "5": plt.subplot(grid[5, 1]),
+        "6": plt.subplot(grid[6, 1]),
+        "7": plt.subplot(grid[7, 1])
+    }
+
+    left_ax["0"].title.set_text("10P + 10S")
+    left_ax["1"].title.set_text("25P + 25S")
+    left_ax["2"].title.set_text("50P + 50S")
+    left_ax["3"].title.set_text("75P + 75S")
+
+    for file in ucast_lats:
+        i = ucast_lats.index(file)
+        df = pd.read_csv(file)
+        combined_df = pd.concat([df["run_1_latency"], df["run_2_latency"], df["run_3_latency"]])
+
+        if i == 0:                  # 10P + 10S
+            plot_cdf("", df["run_1_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("", df["run_2_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("", df["run_3_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("Average", combined_df, left_ax[str(i)], greens[0], 'average')
+            left_ax[str(i)].set_xlim(xmin=0, xmax=40000)
+        elif i == 1:                  # 25P + 25S
+            plot_cdf("", df["run_1_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("", df["run_2_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("", df["run_3_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("Average", combined_df, left_ax[str(i)], greens[0], 'average')
+            left_ax[str(i)].set_xlim(xmin=0, xmax=100000)
+        elif i == 2:                  # 50P + 50S
+            plot_cdf("", df["run_1_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("", df["run_2_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("", df["run_3_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("Average", combined_df, left_ax[str(i)], greens[0], 'average')
+            left_ax[str(i)].set_xlim(xmin=0, xmax=400000)
+        elif i == 3:                  # 75P + 75S
+            plot_cdf("", df["run_1_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("", df["run_2_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("", df["run_3_latency"], left_ax[str(i)], greens[0], 'normal')
+            plot_cdf("Average", combined_df, left_ax[str(i)], greens[0], 'average')
+            # left_ax[str(i)].set_xlim(xmin=0, xmax=4000)
+
+    for file in mcast_lats:
+        i = mcast_lats.index(file)
+        df = pd.read_csv(file)
+        combined_df = pd.concat([df["run_1_latency"], df["run_2_latency"], df["run_3_latency"]])
+
+        if i == 0:                  # 10P + 10S
+            plot_cdf("", df["run_1_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("", df["run_2_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("", df["run_3_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("Average", combined_df, left_ax[str(i)], reds[0], 'average')
+            left_ax[str(i)].set_xlim(xmin=0, xmax=40000)
+        elif i == 1:                  # 25P + 25S
+            plot_cdf("", df["run_1_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("", df["run_2_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("", df["run_3_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("Average", combined_df, left_ax[str(i)], reds[0], 'average')
+            left_ax[str(i)].set_xlim(xmin=0, xmax=100000)
+        elif i == 2:                  # 50P + 50S
+            plot_cdf("", df["run_1_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("", df["run_2_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("", df["run_3_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("Average", combined_df, left_ax[str(i)], reds[0], 'average')
+            left_ax[str(i)].set_xlim(xmin=0, xmax=400000)
+        elif i == 3:                  # 75P + 75S
+            plot_cdf("", df["run_1_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("", df["run_2_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("", df["run_3_latency"], left_ax[str(i)], reds[0], 'normal')
+            plot_cdf("Average", combined_df, left_ax[str(i)], reds[0], 'average')
+            # left_ax[str(i)].set_xlim(xmin=0, xmax=4000)
+
+    for log in ucast_logs:
+        i = ucast_logs.index(log)
+        data = get_network_data(log, 'kilobytes')
+        send_df = pd.DataFrame(data["send_rates"])
+        receive_df = pd.DataFrame(data["receive_rates"])
+        
+        if "_1_" in log:
+        
+            right_ax[str(0)].title.set_text("10P + 10S Send Rate")
+            right_ax[str(1)].title.set_text("10P + 10S Receive Rate")
+        
+            if "run_1" in log:
+                if 'vm1' in log:
+                    label="Run 1"
+                else:
+                    label=""
+                right_ax[str(0)].plot(send_df, color=oranges[0], label=label)
+                right_ax[str(1)].plot(receive_df, color=oranges[0], label=label)
+            elif "run_2" in log:
+                if 'vm1' in log:
+                    label="Run 2"
+                else:
+                    label=""
+                right_ax[str(0)].plot(send_df, color=blues[0], label=label)
+                right_ax[str(1)].plot(receive_df, color=blues[0], label=label)
+            elif "run_3" in log:
+                if 'vm1' in log:
+                    label="Run 3"
+                else:
+                    label=""
+                right_ax[str(0)].plot(send_df, color=greens[0], label=label)
+                right_ax[str(1)].plot(receive_df, color=greens[0], label=label)
+        
+        elif "_2_" in log:
+        
+            right_ax[str(2)].title.set_text("25P + 25S Send Rate")
+            right_ax[str(3)].title.set_text("25P + 25S Receive Rate")
+
+            if "run_1" in log:
+                if 'vm1' in log:
+                    label="Run 1"
+                else:
+                    label=""
+                right_ax[str(2)].plot(send_df, color=oranges[0], label=label)
+                right_ax[str(3)].plot(receive_df, color=oranges[0], label=label)
+            elif "run_2" in log:
+                if 'vm1' in log:
+                    label="Run 2"
+                else:
+                    label=""
+                right_ax[str(2)].plot(send_df, color=blues[0], label=label)
+                right_ax[str(3)].plot(receive_df, color=blues[0], label=label)
+            elif "run_3" in log:
+                if 'vm1' in log:
+                    label="Run 3"
+                else:
+                    label=""
+                right_ax[str(2)].plot(send_df, color=greens[0], label=label)
+                right_ax[str(3)].plot(receive_df, color=greens[0], label=label)
+
+        elif "_3_" in log:
+
+            right_ax[str(4)].title.set_text("50P + 50S Send Rate")
+            right_ax[str(5)].title.set_text("50P + 50S Receive Rate")
+
+            if "run_1" in log:
+                if 'vm1' in log:
+                    label="Run 1"
+                else:
+                    label=""
+                right_ax[str(4)].plot(send_df, color=oranges[0], label=label)
+                right_ax[str(5)].plot(receive_df, color=oranges[0], label=label)
+            elif "run_2" in log:
+                if 'vm1' in log:
+                    label="Run 2"
+                else:
+                    label=""
+                right_ax[str(4)].plot(send_df, color=blues[0], label=label)
+                right_ax[str(5)].plot(receive_df, color=blues[0], label=label)
+            elif "run_3" in log:
+                if 'vm1' in log:
+                    label="Run 3"
+                else:
+                    label=""
+                right_ax[str(4)].plot(send_df, color=greens[0], label=label)
+                right_ax[str(5)].plot(receive_df, color=greens[0], label=label)
+
+        elif "_5_75_participants" in log:
+
+            right_ax[str(6)].title.set_text("75P + 75S Send Rate")
+            right_ax[str(7)].title.set_text("75P + 75S Receive Rate")
+
+            if "run_1" in log:
+                if 'vm1' in log:
+                    label="Run 1"
+                else:
+                    label=""
+                right_ax[str(6)].plot(send_df, color=oranges[0], label=label)
+                right_ax[str(7)].plot(receive_df, color=oranges[0], label=label)
+            elif "run_2" in log:
+                if 'vm1' in log:
+                    label="Run 2"
+                else:
+                    label=""
+                right_ax[str(6)].plot(send_df, color=blues[0], label=label)
+                right_ax[str(7)].plot(receive_df, color=blues[0], label=label)
+            elif "run_3" in log:
+                if 'vm1' in log:
+                    label="Run 3"
+                else:
+                    label=""
+                right_ax[str(6)].plot(send_df, color=greens[0], label=label)
+                right_ax[str(7)].plot(receive_df, color=greens[0], label=label)
+
+    for ax in left_ax:
+        left_ax[str(ax)].set_xlabel("Latency ($\mu$s)")
+
+    for ax in right_ax:
+        right_ax[str(ax)].set_xlim(xmin=0)
+        right_ax[str(ax)].set_ylabel("Rate (kbps)")
+        right_ax[str(ax)].legend()
+
+    for ax in fig.get_axes():
+        ax.grid()
+        # ax.legend(loc=4)
+        ax.set_ylim(ymin=0)
+
+def lat_tp_vs_net_per_vm_10p10s_unicast():
+    lats = [file for file in get_files("data/set_2") if ('network_log_rerun' in file or '_5_75' in file) and 'average_latencies' in file]
+    ulats = [file for file in lats if 'unicast' in file]
+    mlats = [file for file in lats if 'multicast' in file]
+    mlats.sort()
+    mlats = mlats[1:] + mlats[:1]
+
+    tps = [file for file in get_files("data/set_2") if 'average_throughput' in file and ('network_log_rerun' in file or '_5_75' in file)]
+    tps.sort()
+
+    logs = [file for file in get_files("data/set_2") if 'network_usage.log' in file and 'network' in file]
+    logs.sort()
+    ulogs = [file for file in logs if 'unicast' in file]
+    mlogs = [file for file in logs if 'multicast' in file]
+    mlogs = mlogs[12:] + mlogs[:12]
+
+    fig = plt.figure(figsize=(30, 15))
+    grid = plt.GridSpec(4, 4, figure=fig)
+
+    row1 = {
+        'lat': plt.subplot(grid[0:2, 0:2]),
+        'tp': plt.subplot(grid[2:4, 0:2]),
+        'vm1': plt.subplot(grid[0:2, 2]),
+        'vm2': plt.subplot(grid[0:2, 3]),
+        'vm3': plt.subplot(grid[2:4, 2]),
+        'vm4': plt.subplot(grid[2:4, 3])
+    }
+
+    row1['lat'].title.set(text="10P + 10S Latency Measurements Over Increasing Time (Unicast)", fontsize=15, fontweight='bold')
+    ulat = ulats[0]
+    df = pd.read_csv(ulat)
+    row1['lat'].plot(df["run_1_latency"], label="Run 1", color=greens[0])
+    row1['lat'].plot(df["run_2_latency"], label="Run 2", color=blues[0])
+    row1['lat'].plot(df["run_3_latency"], label="Run 3", color=reds[0])
+    row1['lat'].set_xlim(xmin=0, xmax=3000)
+    row1['lat'].set_ylim(ymin=0)
+    row1['lat'].legend()
+    row1['lat'].set_ylabel("Latency ($\mu$s)")
+    row1['lat'].set_xlabel("Measurements Over Increasing Time")
+    row1['lat'].spines['top'].set_visible(False)
+    row1['lat'].spines['right'].set_visible(False)
+
+    curr_tps = [file for file in tps if "unicast_1_" in file]
+    for file in curr_tps:
+        df = pd.read_csv(file)
+        row1['tp'].plot(df["run_1_throughput"], color=greens[0])
+        row1['tp'].plot(df["run_2_throughput"], color=blues[0])
+        row1['tp'].plot(df["run_3_throughput"], color=reds[0])
+
+    lines = [
+        Line2D([0], [0], color=greens[0], lw=2),
+        Line2D([0], [0], color=blues[0], lw=2),
+        Line2D([0], [0], color=reds[0], lw=2)
+    ]
+    row1['tp'].title.set(text="10P + 10S Throughput Measurements Per Increasing Second (Unicast)", fontsize=15, fontweight='bold')
+    row1['tp'].legend(lines, ['Run 1', 'Run 2', 'Run 3'])
+    row1['tp'].set_xlim(xmin=0, xmax=900)
+    row1['tp'].set_ylim(ymin=0)
+    row1['tp'].set_ylabel("Throughput (MBps)")
+    row1['tp'].set_xlabel("Increasing Time (s)")
+    row1['tp'].spines['top'].set_visible(False)
+    row1['tp'].spines['right'].set_visible(False)
+
+    row1['vm1'].title.set(text="Network Send/Receive Rate for VM 1 \n Over Increasing Time Per Every 2 Seconds (3P + 2S)", fontsize=15, fontweight='bold')
+    vm1_logs = [file for file in ulogs if 'vm1' in file and 'unicast_1_' in file]
+    for log in vm1_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm1'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm1'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm1'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm1'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm1'].set_xlim(xmin=0, xmax=450)
+    row1['vm1'].set_ylim(ymin=0)
+
+    row1['vm2'].title.set(text="Network Send/Receive Rate for VM 2 \n Over Increasing Time Per Every 2 Seconds (2P + 3S)", fontsize=15, fontweight='bold')
+    vm2_logs = [file for file in ulogs if 'vm2' in file and 'unicast_1_' in file]
+    for log in vm2_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm2'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm2'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm2'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm2'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm2'].set_xlim(xmin=0, xmax=450)
+    row1['vm2'].set_ylim(ymin=0)
+
+    row1['vm3'].title.set(text="Network Send/Receive Rate for VM 3 \n Over Increasing Time Per Every 2 Seconds (3P + 2S)", fontsize=15, fontweight='bold')
+    vm3_logs = [file for file in ulogs if 'vm3' in file and 'unicast_1_' in file]
+    for log in vm3_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm3'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm3'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm3'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm3'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm3'].set_xlim(xmin=0, xmax=450)
+    row1['vm3'].set_ylim(ymin=0)
+
+    row1['vm4'].title.set(text="Network Send/Receive Rate for VM 4 \n Over Increasing Time Per Every 2 Seconds (2P + 3S)", fontsize=15, fontweight='bold')
+    vm4_logs = [file for file in ulogs if 'vm4' in file and 'unicast_1_' in file]
+    for log in vm4_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm4'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm4'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm4'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    # row1['vm4'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm4'].set_xlim(xmin=0, xmax=450)
+    row1['vm4'].set_ylim(ymin=0)
+
+    # lines = [
+    #     Line2D([0], [0], linewidth=2, color=greens[0]),
+    #     Line2D([0], [0], linewidth=2, color=blues[0]),
+    #     Line2D([0], [0], linewidth=2, color=reds[0]),
+    #     Line2D([0], [0], linewidth=0, marker="_", color='black'),
+    #     Line2D([0], [0], linewidth=0, marker="|", color='black')
+    # ]
+    for row in row1:
+        if 'vm' in row:
+            row1[str(row)].set_xlabel("Increasing Time (s)")
+            row1[str(row)].set_ylabel("Send/Receive Rate (MBps)")
+            row1[str(row)].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+
+    plt.tight_layout(pad=3)
+
+def lat_tp_vs_net_per_vm_10p10s_multicast():
+    lats = [file for file in get_files("data/set_2") if ('network_log_rerun' in file or '_5_75' in file) and 'average_latencies' in file]
+    ulats = [file for file in lats if 'unicast' in file]
+    mlats = [file for file in lats if 'multicast' in file]
+    mlats.sort()
+    mlats = mlats[1:] + mlats[:1]
+
+    tps = [file for file in get_files("data/set_2") if 'average_throughput' in file and ('network_log_rerun' in file or '_5_75' in file)]
+    tps.sort()
+
+    logs = [file for file in get_files("data/set_2") if 'network_usage.log' in file and 'network' in file]
+    logs.sort()
+    ulogs = [file for file in logs if 'unicast' in file]
+    mlogs = [file for file in logs if 'multicast' in file]
+    mlogs = mlogs[12:] + mlogs[:12]
+
+    fig = plt.figure(figsize=(30, 15))
+    grid = plt.GridSpec(4, 4, figure=fig)
+
+    row1 = {
+        'lat': plt.subplot(grid[0:2, 0:2]),
+        'tp': plt.subplot(grid[2:4, 0:2]),
+        'vm1': plt.subplot(grid[0:2, 2]),
+        'vm2': plt.subplot(grid[0:2, 3]),
+        'vm3': plt.subplot(grid[2:4, 2]),
+        'vm4': plt.subplot(grid[2:4, 3])
+    }
+
+    row1['lat'].title.set(text="10P + 10S Latency Measurements Over Increasing Time (Multicast)", fontsize=15, fontweight='bold')
+    mlat = mlats[0]
+    df = pd.read_csv(mlat)
+    row1['lat'].plot(df["run_1_latency"], label="Run 1", color=greens[0])
+    row1['lat'].plot(df["run_2_latency"], label="Run 2", color=blues[0])
+    row1['lat'].plot(df["run_3_latency"], label="Run 3", color=reds[0])
+    row1['lat'].set_xlim(xmin=0, xmax=3000)
+    row1['lat'].set_ylim(ymin=0)
+    row1['lat'].legend()
+    row1['lat'].set_ylabel("Latency ($\mu$s)")
+    row1['lat'].set_xlabel("Measurements Over Increasing Time")
+    row1['lat'].spines['top'].set_visible(False)
+    row1['lat'].spines['right'].set_visible(False)
+
+    curr_tps = [file for file in tps if "multicast_1_" in file]
+    for file in curr_tps:
+        df = pd.read_csv(file)
+        row1['tp'].plot(df["run_1_throughput"], color=greens[0])
+        row1['tp'].plot(df["run_2_throughput"], color=blues[0])
+        row1['tp'].plot(df["run_3_throughput"], color=reds[0])
+
+    lines = [
+        Line2D([0], [0], color=greens[0], lw=2),
+        Line2D([0], [0], color=blues[0], lw=2),
+        Line2D([0], [0], color=reds[0], lw=2)
+    ]
+    row1['tp'].title.set(text="10P + 10S Throughput Measurements Per Increasing Second (Multicast)", fontsize=15, fontweight='bold')
+    row1['tp'].legend(lines, ['Run 1', 'Run 2', 'Run 3'])
+    row1['tp'].set_xlim(xmin=0, xmax=900)
+    row1['tp'].set_ylim(ymin=0)
+    row1['tp'].set_ylabel("Throughput (mbps)")
+    row1['tp'].set_xlabel("Increasing Time (s)")
+    row1['tp'].spines['top'].set_visible(False)
+    row1['tp'].spines['right'].set_visible(False)
+
+    row1['vm1'].title.set(text="Network Send/Receive Rate for VM 1 \n Over Increasing Time Per Every 2 Seconds (12P + 13S)", fontsize=15, fontweight='bold')
+    vm1_logs = [file for file in mlogs if 'vm1' in file and 'multicast_1_' in file]
+    for log in vm1_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm1'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm1'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm1'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm1'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm1'].set_xlim(xmin=0, xmax=450)
+    row1['vm1'].set_ylim(ymin=0)
+
+    row1['vm2'].title.set(text="Network Send/Receive Rate for VM 2 \n Over Increasing Time Per Every 2 Seconds (13P + 12S)", fontsize=15, fontweight='bold')
+    vm2_logs = [file for file in mlogs if 'vm2' in file and 'multicast_1_' in file]
+    for log in vm2_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm2'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm2'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm2'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm2'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm2'].set_xlim(xmin=0, xmax=450)
+    row1['vm2'].set_ylim(ymin=0)
+
+    row1['vm3'].title.set(text="Network Send/Receive Rate for VM 3 \n Over Increasing Time Per Every 2 Seconds (12P + 13S)", fontsize=15, fontweight='bold')
+    vm3_logs = [file for file in mlogs if 'vm3' in file and 'multicast_1_' in file]
+    for log in vm3_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm3'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm3'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm3'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm3'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm3'].set_xlim(xmin=0, xmax=450)
+    row1['vm3'].set_ylim(ymin=0)
+
+    row1['vm4'].title.set(text="Network Send/Receive Rate for VM 4 \n Over Increasing Time Per Every 2 Seconds (13P + 12S)", fontsize=15, fontweight='bold')
+    vm4_logs = [file for file in mlogs if 'vm4' in file and 'multicast_1_' in file]
+    for log in vm4_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm4'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm4'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm4'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    # row1['vm4'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm4'].set_xlim(xmin=0, xmax=450)
+    row1['vm4'].set_ylim(ymin=0)
+
+    # lines = [
+    #     Line2D([0], [0], linewidth=2, color=greens[0]),
+    #     Line2D([0], [0], linewidth=2, color=blues[0]),
+    #     Line2D([0], [0], linewidth=2, color=reds[0]),
+    #     Line2D([0], [0], linewidth=0, marker="_", color='black'),
+    #     Line2D([0], [0], linewidth=0, marker="|", color='black')
+    # ]
+    for row in row1:
+        if 'vm' in row:
+            row1[str(row)].set_xlabel("Increasing Time (s)")
+            row1[str(row)].set_ylabel("Send/Receive Rate (MBps)")
+            row1[str(row)].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+
+    plt.tight_layout(pad=3)
+
+def lat_tp_vs_net_per_vm_25p25s_unicast():
+    lats = [file for file in get_files("data/set_2") if ('network_log_rerun' in file or '_5_75' in file) and 'average_latencies' in file]
+    ulats = [file for file in lats if 'unicast' in file]
+    mlats = [file for file in lats if 'multicast' in file]
+    mlats.sort()
+    mlats = mlats[1:] + mlats[:1]
+
+    tps = [file for file in get_files("data/set_2") if 'average_throughput' in file and ('network_log_rerun' in file or '_5_75' in file)]
+    tps.sort()
+
+    logs = [file for file in get_files("data/set_2") if 'network_usage.log' in file and 'network' in file]
+    logs.sort()
+    ulogs = [file for file in logs if 'unicast' in file]
+    mlogs = [file for file in logs if 'multicast' in file]
+    mlogs = mlogs[12:] + mlogs[:12]
+
+    fig = plt.figure(figsize=(30, 15))
+    grid = plt.GridSpec(4, 4, figure=fig)
+
+    row1 = {
+        'lat': plt.subplot(grid[0:2, 0:2]),
+        'tp': plt.subplot(grid[2:4, 0:2]),
+        'vm1': plt.subplot(grid[0:2, 2]),
+        'vm2': plt.subplot(grid[0:2, 3]),
+        'vm3': plt.subplot(grid[2:4, 2]),
+        'vm4': plt.subplot(grid[2:4, 3])
+    }
+
+    row1['lat'].title.set(text="25P + 25S Latency Measurements Over Increasing Time (Unicast)", fontsize=15, fontweight='bold')
+    ulat = ulats[1]
+    df = pd.read_csv(ulat)
+    row1['lat'].plot(df["run_1_latency"], label="Run 1", color=greens[0])
+    row1['lat'].plot(df["run_2_latency"], label="Run 2", color=blues[0])
+    row1['lat'].plot(df["run_3_latency"], label="Run 3", color=reds[0])
+    row1['lat'].set_xlim(xmin=0)
+    row1['lat'].set_ylim(ymin=0)
+    row1['lat'].legend()
+    row1['lat'].set_ylabel("Latency ($\mu$s)")
+    row1['lat'].set_xlabel("Measurements Over Increasing Time")
+    row1['lat'].spines['top'].set_visible(False)
+    row1['lat'].spines['right'].set_visible(False)
+
+    curr_tps = [file for file in tps if "unicast_2_" in file]
+    for file in curr_tps:
+        df = pd.read_csv(file)
+        row1['tp'].plot(df["run_1_throughput"], color=greens[0])
+        row1['tp'].plot(df["run_2_throughput"], color=blues[0])
+        row1['tp'].plot(df["run_3_throughput"], color=reds[0])
+
+    lines = [
+        Line2D([0], [0], color=greens[0], lw=2),
+        Line2D([0], [0], color=blues[0], lw=2),
+        Line2D([0], [0], color=reds[0], lw=2)
+    ]
+    row1['tp'].title.set(text="25P + 25S Throughput Measurements Per Increasing Second (Unicast)", fontsize=15, fontweight='bold')
+    row1['tp'].legend(lines, ['Run 1', 'Run 2', 'Run 3'])
+    row1['tp'].set_xlim(xmin=0, xmax=900)
+    row1['tp'].set_ylim(ymin=0)
+    row1['tp'].set_ylabel("Throughput (mbps)")
+    row1['tp'].set_xlabel("Increasing Time (s)")
+    row1['tp'].spines['top'].set_visible(False)
+    row1['tp'].spines['right'].set_visible(False)
+
+    row1['vm1'].title.set(text="Network Send/Receive Rate for VM 1 \n Over Increasing Time Per Every 2 Seconds (6P + 6S)", fontsize=15, fontweight='bold')
+    vm1_logs = [file for file in ulogs if 'vm1' in file and 'unicast_2_' in file]
+    for log in vm1_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm1'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm1'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm1'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm1'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm1'].set_xlim(xmin=0, xmax=450)
+    row1['vm1'].set_ylim(ymin=0)
+
+    row1['vm2'].title.set(text="Network Send/Receive Rate for VM 2 \n Over Increasing Time Per Every 2 Seconds (7P + 6S)", fontsize=15, fontweight='bold')
+    vm2_logs = [file for file in ulogs if 'vm2' in file and 'unicast_2_' in file]
+    for log in vm2_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm2'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm2'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm2'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm2'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm2'].set_xlim(xmin=0, xmax=450)
+    row1['vm2'].set_ylim(ymin=0)
+
+    row1['vm3'].title.set(text="Network Send/Receive Rate for VM 3 \n Over Increasing Time Per Every 2 Seconds (6P + 6S)", fontsize=15, fontweight='bold')
+    vm3_logs = [file for file in ulogs if 'vm3' in file and 'unicast_2_' in file]
+    for log in vm3_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm3'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm3'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm3'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm3'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm3'].set_xlim(xmin=0, xmax=450)
+    row1['vm3'].set_ylim(ymin=0)
+
+    row1['vm4'].title.set(text="Network Send/Receive Rate for VM 4 \n Over Increasing Time Per Every 2 Seconds (6P + 7S)", fontsize=15, fontweight='bold')
+    vm4_logs = [file for file in ulogs if 'vm4' in file and 'unicast_2_' in file]
+    for log in vm4_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm4'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm4'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm4'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    # row1['vm4'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm4'].set_xlim(xmin=0, xmax=450)
+    row1['vm4'].set_ylim(ymin=0)
+
+    # lines = [
+    #     Line2D([0], [0], linewidth=2, color=greens[0]),
+    #     Line2D([0], [0], linewidth=2, color=blues[0]),
+    #     Line2D([0], [0], linewidth=2, color=reds[0]),
+    #     Line2D([0], [0], linewidth=0, marker="_", color='black'),
+    #     Line2D([0], [0], linewidth=0, marker="|", color='black')
+    # ]
+    for row in row1:
+        if 'vm' in row:
+            row1[str(row)].set_xlabel("Increasing Time In 2s Increments(s)")
+            row1[str(row)].set_ylabel("Send/Receive Rate (MBps)")
+            row1[str(row)].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+
+    plt.tight_layout(pad=3)
+
+def lat_tp_vs_net_per_vm_25p25s_multicast():
+    lats = [file for file in get_files("data/set_2") if ('network_log_rerun' in file or '_5_75' in file) and 'average_latencies' in file]
+    ulats = [file for file in lats if 'unicast' in file]
+    mlats = [file for file in lats if 'multicast' in file]
+    mlats.sort()
+    mlats = mlats[1:] + mlats[:1]
+
+    tps = [file for file in get_files("data/set_2") if 'average_throughput' in file and ('network_log_rerun' in file or '_5_75' in file)]
+    tps.sort()
+
+    logs = [file for file in get_files("data/set_2") if 'network_usage.log' in file and 'network' in file]
+    logs.sort()
+    ulogs = [file for file in logs if 'unicast' in file]
+    mlogs = [file for file in logs if 'multicast' in file]
+    mlogs = mlogs[12:] + mlogs[:12]
+
+    fig = plt.figure(figsize=(30, 15))
+    grid = plt.GridSpec(4, 4, figure=fig)
+
+    row1 = {
+        'lat': plt.subplot(grid[0:2, 0:2]),
+        'tp': plt.subplot(grid[2:4, 0:2]),
+        'vm1': plt.subplot(grid[0:2, 2]),
+        'vm2': plt.subplot(grid[0:2, 3]),
+        'vm3': plt.subplot(grid[2:4, 2]),
+        'vm4': plt.subplot(grid[2:4, 3])
+    }
+
+    row1['lat'].title.set(text="25P + 25S Latency Measurements Over Increasing Time (Multicast)", fontsize=15, fontweight='bold')
+    mlat = mlats[1]
+    df = pd.read_csv(mlat)
+    row1['lat'].plot(df["run_1_latency"], label="Run 1", color=greens[0])
+    row1['lat'].plot(df["run_2_latency"], label="Run 2", color=blues[0])
+    row1['lat'].plot(df["run_3_latency"], label="Run 3", color=reds[0])
+    row1['lat'].set_xlim(xmin=0)
+    row1['lat'].set_ylim(ymin=0)
+    row1['lat'].legend()
+    row1['lat'].set_ylabel("Latency ($\mu$s)")
+    row1['lat'].set_xlabel("Measurements Over Increasing Time")
+    row1['lat'].spines['top'].set_visible(False)
+    row1['lat'].spines['right'].set_visible(False)
+
+    curr_tps = [file for file in tps if "multicast_2_" in file]
+    for file in curr_tps:
+        df = pd.read_csv(file)
+        row1['tp'].plot(df["run_1_throughput"], color=greens[0])
+        row1['tp'].plot(df["run_2_throughput"], color=blues[0])
+        row1['tp'].plot(df["run_3_throughput"], color=reds[0])
+
+    lines = [
+        Line2D([0], [0], color=greens[0], lw=2),
+        Line2D([0], [0], color=blues[0], lw=2),
+        Line2D([0], [0], color=reds[0], lw=2)
+    ]
+    row1['tp'].title.set(text="25P + 25S Throughput Measurements Per Increasing Second (Multicast)", fontsize=15, fontweight='bold')
+    row1['tp'].legend(lines, ['Run 1', 'Run 2', 'Run 3'])
+    row1['tp'].set_xlim(xmin=0, xmax=900)
+    row1['tp'].set_ylim(ymin=0)
+    row1['tp'].set_ylabel("Throughput (mbps)")
+    row1['tp'].set_xlabel("Increasing Time (s)")
+    row1['tp'].spines['top'].set_visible(False)
+    row1['tp'].spines['right'].set_visible(False)
+
+    row1['vm1'].title.set(text="Network Send/Receive Rate for VM 1 \n Over Increasing Time Per Every 2 Seconds (6P + 6S)", fontsize=15, fontweight='bold')
+    vm1_logs = [file for file in mlogs if 'vm1' in file and 'multicast_2_' in file]
+    for log in vm1_logs:
+        df = pd.DataFrame.from_dict(get_network_data(log, 'megabytes'), orient='index')
+        df = df.transpose()
+        # df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm1'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm1'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm1'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm1'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm1'].set_xlim(xmin=0, xmax=450)
+    row1['vm1'].set_ylim(ymin=0)
+
+    row1['vm2'].title.set(text="Network Send/Receive Rate for VM 2 \n Over Increasing Time Per Every 2 Seconds (7P + 6S)", fontsize=15, fontweight='bold')
+    vm2_logs = [file for file in mlogs if 'vm2' in file and 'multicast_2_' in file]
+    for log in vm2_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm2'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm2'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm2'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm2'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm2'].set_xlim(xmin=0, xmax=450)
+    row1['vm2'].set_ylim(ymin=0)
+
+    row1['vm3'].title.set(text="Network Send/Receive Rate for VM 3 \n Over Increasing Time Per Every 2 Seconds (6P + 6S)", fontsize=15, fontweight='bold')
+    vm3_logs = [file for file in mlogs if 'vm3' in file and 'multicast_2_' in file]
+    for log in vm3_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm3'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm3'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm3'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm3'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm3'].set_xlim(xmin=0, xmax=450)
+    row1['vm3'].set_ylim(ymin=0)
+
+    row1['vm4'].title.set(text="Network Send/Receive Rate for VM 4 \n Over Increasing Time Per Every 2 Seconds (6P + 7S)", fontsize=15, fontweight='bold')
+    vm4_logs = [file for file in mlogs if 'vm4' in file and 'multicast_2_' in file]
+    for log in vm4_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm4'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm4'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm4'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    # row1['vm4'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm4'].set_xlim(xmin=0, xmax=450)
+    row1['vm4'].set_ylim(ymin=0)
+
+    # lines = [
+    #     Line2D([0], [0], linewidth=2, color=greens[0]),
+    #     Line2D([0], [0], linewidth=2, color=blues[0]),
+    #     Line2D([0], [0], linewidth=2, color=reds[0]),
+    #     Line2D([0], [0], linewidth=0, marker="_", color='black'),
+    #     Line2D([0], [0], linewidth=0, marker="|", color='black')
+    # ]
+    for row in row1:
+        if 'vm' in row:
+            row1[str(row)].set_xlabel("Increasing Time In 2s Increments(s)")
+            row1[str(row)].set_ylabel("Send/Receive Rate (MBps)")
+            row1[str(row)].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+
+    plt.tight_layout(pad=3)
+
+def lat_tp_vs_net_per_vm_50p50s_unicast():
+    lats = [file for file in get_files("data/set_2") if ('network_log_rerun' in file or '_5_75' in file) and 'average_latencies' in file]
+    ulats = [file for file in lats if 'unicast' in file]
+    mlats = [file for file in lats if 'multicast' in file]
+    mlats.sort()
+    mlats = mlats[1:] + mlats[:1]
+
+    tps = [file for file in get_files("data/set_2") if 'average_throughput' in file and ('network_log_rerun' in file or '_5_75' in file)]
+    tps.sort()
+
+    logs = [file for file in get_files("data/set_2") if 'network_usage.log' in file and 'network' in file]
+    logs.sort()
+    ulogs = [file for file in logs if 'unicast' in file]
+    mlogs = [file for file in logs if 'multicast' in file]
+    mlogs = mlogs[12:] + mlogs[:12]
+
+    fig = plt.figure(figsize=(30, 15))
+    grid = plt.GridSpec(4, 4, figure=fig)
+
+    row1 = {
+        'lat': plt.subplot(grid[0:2, 0:2]),
+        'tp': plt.subplot(grid[2:4, 0:2]),
+        'vm1': plt.subplot(grid[0:2, 2]),
+        'vm2': plt.subplot(grid[0:2, 3]),
+        'vm3': plt.subplot(grid[2:4, 2]),
+        'vm4': plt.subplot(grid[2:4, 3])
+    }
+
+    row1['lat'].title.set(text="50P + 50S Latency Measurements Over Increasing Time (Unicast)", fontsize=15, fontweight='bold')
+    ulat = ulats[2]
+    df = pd.read_csv(ulat)
+    row1['lat'].plot(df["run_1_latency"], label="Run 1", color=greens[0])
+    row1['lat'].plot(df["run_2_latency"], label="Run 2", color=blues[0])
+    row1['lat'].plot(df["run_3_latency"], label="Run 3", color=reds[0])
+    row1['lat'].set_xlim(xmin=0)
+    # row1['lat'].set_ylim(ymin=0)
+    row1['lat'].set_yscale('log')
+    row1['lat'].legend()
+    row1['lat'].set_ylabel("Latency ($\mu$s)")
+    row1['lat'].set_xlabel("Measurements Over Increasing Time")
+    row1['lat'].spines['top'].set_visible(False)
+    row1['lat'].spines['right'].set_visible(False)
+
+    curr_tps = [file for file in tps if "unicast_5_" in file]
+    for file in curr_tps:
+        df = pd.read_csv(file)
+        row1['tp'].plot(df["run_1_throughput"], color=greens[0])
+        row1['tp'].plot(df["run_2_throughput"], color=blues[0])
+        row1['tp'].plot(df["run_3_throughput"], color=reds[0])
+
+    lines = [
+        Line2D([0], [0], color=greens[0], lw=2),
+        Line2D([0], [0], color=blues[0], lw=2),
+        Line2D([0], [0], color=reds[0], lw=2)
+    ]
+    row1['tp'].title.set(text="50P + 50S Throughput Measurements Per Increasing Second (Unicast)", fontsize=15, fontweight='bold')
+    row1['tp'].legend(lines, ['Run 1', 'Run 2', 'Run 3'])
+    row1['tp'].set_xlim(xmin=0, xmax=900)
+    row1['tp'].set_ylim(ymin=0)
+    row1['tp'].set_ylabel("Throughput (mbps)")
+    row1['tp'].set_xlabel("Increasing Time (s)")
+    row1['tp'].spines['top'].set_visible(False)
+    row1['tp'].spines['right'].set_visible(False)
+
+    row1['vm1'].title.set(text="Network Send/Receive Rate for VM 1 \n Over Increasing Time Per Every 2 Seconds (12P + 13S)", fontsize=15, fontweight='bold')
+    vm1_logs = [file for file in ulogs if 'vm1' in file and 'unicast_5_' in file]
+    for log in vm1_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm1'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm1'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm1'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm1'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm1'].set_xlim(xmin=0, xmax=450)
+    row1['vm1'].set_ylim(ymin=0)
+
+    row1['vm2'].title.set(text="Network Send/Receive Rate for VM 2 \n Over Increasing Time Per Every 2 Seconds (13P + 12S)", fontsize=15, fontweight='bold')
+    vm2_logs = [file for file in ulogs if 'vm2' in file and 'unicast_5_' in file]
+    for log in vm2_logs:
+        # df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        df = pd.DataFrame.from_dict(get_network_data(log, 'megabytes'), orient='index')
+        df = df.transpose()
+        if 'run_1' in log:  
+            row1['vm2'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm2'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm2'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm2'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm2'].set_xlim(xmin=0, xmax=450)
+    row1['vm2'].set_ylim(ymin=0)
+
+    row1['vm3'].title.set(text="Network Send/Receive Rate for VM 3 \n Over Increasing Time Per Every 2 Seconds (12P + 13S)", fontsize=15, fontweight='bold')
+    vm3_logs = [file for file in ulogs if 'vm3' in file and 'unicast_5_' in file]
+    for log in vm3_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm3'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm3'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm3'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm3'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm3'].set_xlim(xmin=0, xmax=450)
+    row1['vm3'].set_ylim(ymin=0)
+
+    row1['vm4'].title.set(text="Network Send/Receive Rate for VM 4 \n Over Increasing Time Per Every 2 Seconds (13P + 12S)", fontsize=15, fontweight='bold')
+    vm4_logs = [file for file in ulogs if 'vm4' in file and 'unicast_5_' in file]
+    for log in vm4_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm4'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm4'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm4'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    # row1['vm4'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm4'].set_xlim(xmin=0, xmax=450)
+    row1['vm4'].set_ylim(ymin=0)
+
+    # lines = [
+    #     Line2D([0], [0], linewidth=2, color=greens[0]),
+    #     Line2D([0], [0], linewidth=2, color=blues[0]),
+    #     Line2D([0], [0], linewidth=2, color=reds[0]),
+    #     Line2D([0], [0], linewidth=0, marker="_", color='black'),
+    #     Line2D([0], [0], linewidth=0, marker="|", color='black')
+    # ]
+    for row in row1:
+        if 'vm' in row:
+            row1[str(row)].set_xlabel("Increasing Time In 2s Increments(s)")
+            row1[str(row)].set_ylabel("Send/Receive Rate (MBps)")
+            row1[str(row)].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+
+    plt.tight_layout(pad=3)
+
+def lat_tp_vs_net_per_vm_50p50s_multicast():
+    lats = [file for file in get_files("data/set_2") if ('network_log_rerun' in file or '_5_75' in file) and 'average_latencies' in file]
+    ulats = [file for file in lats if 'unicast' in file]
+    mlats = [file for file in lats if 'multicast' in file]
+    mlats.sort()
+    mlats = mlats[1:] + mlats[:1]
+
+    tps = [file for file in get_files("data/set_2") if 'average_throughput' in file and ('network_log_rerun' in file or '_5_75' in file)]
+    tps.sort()
+
+    logs = [file for file in get_files("data/set_2") if 'network_usage.log' in file and 'network' in file]
+    logs.sort()
+    ulogs = [file for file in logs if 'unicast' in file]
+    mlogs = [file for file in logs if 'multicast' in file]
+    mlogs = mlogs[12:] + mlogs[:12]
+
+    fig = plt.figure(figsize=(30, 15))
+    grid = plt.GridSpec(4, 4, figure=fig)
+
+    row1 = {
+        'lat': plt.subplot(grid[0:2, 0:2]),
+        'tp': plt.subplot(grid[2:4, 0:2]),
+        'vm1': plt.subplot(grid[0:2, 2]),
+        'vm2': plt.subplot(grid[0:2, 3]),
+        'vm3': plt.subplot(grid[2:4, 2]),
+        'vm4': plt.subplot(grid[2:4, 3])
+    }
+
+    row1['lat'].title.set(text="50P + 50S Latency Measurements Over Increasing Time (Multicast)", fontsize=15, fontweight='bold')
+    mlat = mlats[2]
+    df = pd.read_csv(mlat)
+    row1['lat'].plot(df["run_1_latency"], label="Run 1", color=greens[0])
+    row1['lat'].plot(df["run_2_latency"], label="Run 2", color=blues[0])
+    row1['lat'].plot(df["run_3_latency"], label="Run 3", color=reds[0])
+    row1['lat'].set_xlim(xmin=0)
+    # row1['lat'].set_ylim(ymin=0)
+    row1['lat'].set_yscale('log')
+    row1['lat'].legend()
+    row1['lat'].set_ylabel("Latency ($\mu$s)")
+    row1['lat'].set_xlabel("Measurements Over Increasing Time")
+    row1['lat'].spines['top'].set_visible(False)
+    row1['lat'].spines['right'].set_visible(False)
+
+    curr_tps = [file for file in tps if "multicast_3_" in file]
+    for file in curr_tps:
+        df = pd.read_csv(file)
+        row1['tp'].plot(df["run_1_throughput"], color=greens[0])
+        row1['tp'].plot(df["run_2_throughput"], color=blues[0])
+        row1['tp'].plot(df["run_3_throughput"], color=reds[0])
+
+    lines = [
+        Line2D([0], [0], color=greens[0], lw=2),
+        Line2D([0], [0], color=blues[0], lw=2),
+        Line2D([0], [0], color=reds[0], lw=2)
+    ]
+    row1['tp'].title.set(text="50P + 50S Throughput Measurements Per Increasing Second (Multicast)", fontsize=15, fontweight='bold')
+    row1['tp'].legend(lines, ['Run 1', 'Run 2', 'Run 3'])
+    row1['tp'].set_xlim(xmin=0, xmax=900)
+    row1['tp'].set_ylim(ymin=0)
+    row1['tp'].set_ylabel("Throughput (mbps)")
+    row1['tp'].set_xlabel("Increasing Time (s)")
+    row1['tp'].spines['top'].set_visible(False)
+    row1['tp'].spines['right'].set_visible(False)
+
+    row1['vm1'].title.set(text="Network Send/Receive Rate for VM 1 \n Over Increasing Time Per Every 2 Seconds (12P + 13S)", fontsize=15, fontweight='bold')
+    vm1_logs = [file for file in mlogs if 'vm1' in file and 'multicast_3_' in file]
+    for log in vm1_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm1'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm1'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm1'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm1'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm1'].set_xlim(xmin=0, xmax=450)
+    row1['vm1'].set_ylim(ymin=0)
+
+    row1['vm2'].title.set(text="Network Send/Receive Rate for VM 2 \n Over Increasing Time Per Every 2 Seconds (13P + 12S)", fontsize=15, fontweight='bold')
+    vm2_logs = [file for file in mlogs if 'vm2' in file and 'multicast_3_' in file]
+    for log in vm2_logs:
+        # df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        df = pd.DataFrame.from_dict(get_network_data(log, 'megabytes'), orient='index')
+        df = df.transpose()
+        if 'run_1' in log:  
+            row1['vm2'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm2'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm2'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm2'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm2'].set_xlim(xmin=0, xmax=450)
+    row1['vm2'].set_ylim(ymin=0)
+
+    row1['vm3'].title.set(text="Network Send/Receive Rate for VM 3 \n Over Increasing Time Per Every 2 Seconds (12P + 13S)", fontsize=15, fontweight='bold')
+    vm3_logs = [file for file in mlogs if 'vm3' in file and 'multicast_3_' in file]
+    for log in vm3_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm3'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm3'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm3'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm3'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm3'].set_xlim(xmin=0, xmax=450)
+    row1['vm3'].set_ylim(ymin=0)
+
+    row1['vm4'].title.set(text="Network Send/Receive Rate for VM 4 \n Over Increasing Time Per Every 2 Seconds (13P + 12S)", fontsize=15, fontweight='bold')
+    vm4_logs = [file for file in mlogs if 'vm4' in file and 'multicast_3_' in file]
+    for log in vm4_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm4'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm4'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm4'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    # row1['vm4'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm4'].set_xlim(xmin=0, xmax=450)
+    row1['vm4'].set_ylim(ymin=0)
+
+    # lines = [
+    #     Line2D([0], [0], linewidth=2, color=greens[0]),
+    #     Line2D([0], [0], linewidth=2, color=blues[0]),
+    #     Line2D([0], [0], linewidth=2, color=reds[0]),
+    #     Line2D([0], [0], linewidth=0, marker="_", color='black'),
+    #     Line2D([0], [0], linewidth=0, marker="|", color='black')
+    # ]
+    for row in row1:
+        if 'vm' in row:
+            row1[str(row)].set_xlabel("Increasing Time In 2s Increments(s)")
+            row1[str(row)].set_ylabel("Send/Receive Rate (MBps)")
+            row1[str(row)].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+
+    plt.tight_layout(pad=3)
+
+def lat_tp_vs_net_per_vm_75p75s_unicast():
+    lats = [file for file in get_files("data/set_2") if ('network_log_rerun' in file or '_5_75' in file) and 'average_latencies' in file]
+    ulats = [file for file in lats if 'unicast' in file]
+    mlats = [file for file in lats if 'multicast' in file]
+    mlats.sort()
+    mlats = mlats[1:] + mlats[:1]
+
+    tps = [file for file in get_files("data/set_2") if 'average_throughput' in file and ('network_log_rerun' in file or '_5_75' in file)]
+    tps.sort()
+
+    logs = [file for file in get_files("data/set_2") if 'network_usage.log' in file and 'network' in file]
+    logs.sort()
+    ulogs = [file for file in logs if 'unicast' in file]
+    mlogs = [file for file in logs if 'multicast' in file]
+    mlogs = mlogs[12:] + mlogs[:12]
+
+    fig = plt.figure(figsize=(30, 15))
+    grid = plt.GridSpec(4, 4, figure=fig)
+
+    row1 = {
+        'lat': plt.subplot(grid[0:2, 0:2]),
+        'tp': plt.subplot(grid[2:4, 0:2]),
+        'vm1': plt.subplot(grid[0:2, 2]),
+        'vm2': plt.subplot(grid[0:2, 3]),
+        'vm3': plt.subplot(grid[2:4, 2]),
+        'vm4': plt.subplot(grid[2:4, 3])
+    }
+
+    row1['lat'].title.set(text="75P + 75S Latency Measurements Over Increasing Time (Unicast)", fontsize=15, fontweight='bold')
+    ulat = ulats[3]
+    df = pd.read_csv(ulat)
+    row1['lat'].plot(df["run_1_latency"], label="Run 1", color=greens[0])
+    row1['lat'].plot(df["run_2_latency"], label="Run 2", color=blues[0])
+    row1['lat'].plot(df["run_3_latency"], label="Run 3", color=reds[0])
+    row1['lat'].set_xlim(xmin=0)
+    # row1['lat'].set_ylim(ymin=0)
+    row1['lat'].set_yscale('log')
+    row1['lat'].legend()
+    row1['lat'].set_ylabel("Latency ($\mu$s)")
+    row1['lat'].set_xlabel("Measurements Over Increasing Time")
+    row1['lat'].spines['top'].set_visible(False)
+    row1['lat'].spines['right'].set_visible(False)
+
+    curr_tps = [file for file in tps if "unicast_5_" in file]
+    for file in curr_tps:
+        df = pd.read_csv(file)
+        row1['tp'].plot(df["run_1_throughput"], color=greens[0])
+        row1['tp'].plot(df["run_2_throughput"], color=blues[0])
+        row1['tp'].plot(df["run_3_throughput"], color=reds[0])
+
+    lines = [
+        Line2D([0], [0], color=greens[0], lw=2),
+        Line2D([0], [0], color=blues[0], lw=2),
+        Line2D([0], [0], color=reds[0], lw=2)
+    ]
+    row1['tp'].title.set(text="75P + 75S Throughput Measurements Per Increasing Second (Unicast)", fontsize=15, fontweight='bold')
+    row1['tp'].legend(lines, ['Run 1', 'Run 2', 'Run 3'])
+    row1['tp'].set_xlim(xmin=0, xmax=900)
+    row1['tp'].set_ylim(ymin=0)
+    row1['tp'].set_ylabel("Throughput (mbps)")
+    row1['tp'].set_xlabel("Increasing Time (s)")
+    row1['tp'].spines['top'].set_visible(False)
+    row1['tp'].spines['right'].set_visible(False)
+
+    row1['vm1'].title.set(text="Network Send/Receive Rate for VM 1 \n Over Increasing Time Per Every 2 Seconds (19P + 18S)", fontsize=15, fontweight='bold')
+    vm1_logs = [file for file in ulogs if 'vm1' in file and 'unicast_5_' in file]
+    for log in vm1_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm1'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm1'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm1'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm1'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm1'].set_xlim(xmin=0, xmax=450)
+    row1['vm1'].set_ylim(ymin=0)
+
+    row1['vm2'].title.set(text="Network Send/Receive Rate for VM 2 \n Over Increasing Time Per Every 2 Seconds (19P + 19S)", fontsize=15, fontweight='bold')
+    vm2_logs = [file for file in ulogs if 'vm2' in file and 'unicast_5_' in file]
+    for log in vm2_logs:
+        # df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        df = pd.DataFrame.from_dict(get_network_data(log, 'megabytes'), orient='index')
+        df = df.transpose()
+        if 'run_1' in log:  
+            row1['vm2'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm2'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm2'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm2'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm2'].set_xlim(xmin=0, xmax=450)
+    row1['vm2'].set_ylim(ymin=0)
+
+    row1['vm3'].title.set(text="Network Send/Receive Rate for VM 3 \n Over Increasing Time Per Every 2 Seconds (19P + 19S)", fontsize=15, fontweight='bold')
+    vm3_logs = [file for file in ulogs if 'vm3' in file and 'unicast_5_' in file]
+    for log in vm3_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm3'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm3'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm3'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm3'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm3'].set_xlim(xmin=0, xmax=450)
+    row1['vm3'].set_ylim(ymin=0)
+
+    row1['vm4'].title.set(text="Network Send/Receive Rate for VM 4 \n Over Increasing Time Per Every 2 Seconds (18P + 19S)", fontsize=15, fontweight='bold')
+    vm4_logs = [file for file in ulogs if 'vm4' in file and 'unicast_5_' in file]
+    for log in vm4_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm4'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm4'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm4'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    # row1['vm4'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm4'].set_xlim(xmin=0, xmax=450)
+    row1['vm4'].set_ylim(ymin=0)
+
+    # lines = [
+    #     Line2D([0], [0], linewidth=2, color=greens[0]),
+    #     Line2D([0], [0], linewidth=2, color=blues[0]),
+    #     Line2D([0], [0], linewidth=2, color=reds[0]),
+    #     Line2D([0], [0], linewidth=0, marker="_", color='black'),
+    #     Line2D([0], [0], linewidth=0, marker="|", color='black')
+    # ]
+    for row in row1:
+        if 'vm' in row:
+            row1[str(row)].set_xlabel("Increasing Time In 2s Increments(s)")
+            row1[str(row)].set_ylabel("Send/Receive Rate (MBps)")
+            row1[str(row)].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+
+    plt.tight_layout(pad=3)
+
+def lat_tp_vs_net_per_vm_75p75s_multicast():
+    lats = [file for file in get_files("data/set_2") if ('network_log_rerun' in file or '_5_75' in file) and 'average_latencies' in file]
+    ulats = [file for file in lats if 'unicast' in file]
+    mlats = [file for file in lats if 'multicast' in file]
+    mlats.sort()
+    mlats = mlats[1:] + mlats[:1]
+
+    tps = [file for file in get_files("data/set_2") if 'average_throughput' in file and ('network_log_rerun' in file or '_5_75' in file)]
+    tps.sort()
+
+    logs = [file for file in get_files("data/set_2") if 'network_usage.log' in file and 'network' in file]
+    logs.sort()
+    ulogs = [file for file in logs if 'unicast' in file]
+    mlogs = [file for file in logs if 'multicast' in file]
+    mlogs = mlogs[12:] + mlogs[:12]
+
+    fig = plt.figure(figsize=(30, 15))
+    grid = plt.GridSpec(4, 4, figure=fig)
+
+    row1 = {
+        'lat': plt.subplot(grid[0:2, 0:2]),
+        'tp': plt.subplot(grid[2:4, 0:2]),
+        'vm1': plt.subplot(grid[0:2, 2]),
+        'vm2': plt.subplot(grid[0:2, 3]),
+        'vm3': plt.subplot(grid[2:4, 2]),
+        'vm4': plt.subplot(grid[2:4, 3])
+    }
+
+    row1['lat'].title.set(text="75P + 75S Latency Measurements Over Increasing Time (Multicast)", fontsize=15, fontweight='bold')
+    mlat = mlats[3]
+    df = pd.read_csv(mlat)
+    row1['lat'].plot(df["run_1_latency"], label="Run 1", color=greens[0])
+    row1['lat'].plot(df["run_2_latency"], label="Run 2", color=blues[0])
+    row1['lat'].plot(df["run_3_latency"], label="Run 3", color=reds[0])
+    row1['lat'].set_xlim(xmin=0)
+    # row1['lat'].set_ylim(ymin=0)
+    row1['lat'].set_yscale('log')
+    row1['lat'].legend()
+    row1['lat'].set_ylabel("Latency ($\mu$s)")
+    row1['lat'].set_xlabel("Measurements Over Increasing Time")
+    row1['lat'].spines['top'].set_visible(False)
+    row1['lat'].spines['right'].set_visible(False)
+
+    curr_tps = [file for file in tps if "multicast_5_" in file]
+    for file in curr_tps:
+        df = pd.read_csv(file)
+        row1['tp'].plot(df["run_1_throughput"], color=greens[0])
+        row1['tp'].plot(df["run_2_throughput"], color=blues[0])
+        row1['tp'].plot(df["run_3_throughput"], color=reds[0])
+
+    lines = [
+        Line2D([0], [0], color=greens[0], lw=2),
+        Line2D([0], [0], color=blues[0], lw=2),
+        Line2D([0], [0], color=reds[0], lw=2)
+    ]
+    row1['tp'].title.set(text="75P + 75S Throughput Measurements Per Increasing Second (Multicast)", fontsize=15, fontweight='bold')
+    row1['tp'].legend(lines, ['Run 1', 'Run 2', 'Run 3'])
+    row1['tp'].set_xlim(xmin=0, xmax=900)
+    row1['tp'].set_ylim(ymin=0)
+    row1['tp'].set_ylabel("Throughput (mbps)")
+    row1['tp'].set_xlabel("Increasing Time (s)")
+    row1['tp'].spines['top'].set_visible(False)
+    row1['tp'].spines['right'].set_visible(False)
+
+    row1['vm1'].title.set(text="Network Send/Receive Rate for VM 1 \n Over Increasing Time Per Every 2 Seconds (19P + 18S)", fontsize=15, fontweight='bold')
+    vm1_logs = [file for file in mlogs if 'vm1' in file and 'multicast_5_' in file]
+    for log in vm1_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm1'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm1'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm1'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm1'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm1'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm1'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm1'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm1'].set_xlim(xmin=0, xmax=450)
+    row1['vm1'].set_ylim(ymin=0)
+
+    row1['vm2'].title.set(text="Network Send/Receive Rate for VM 2 \n Over Increasing Time Per Every 2 Seconds (19P + 19S)", fontsize=15, fontweight='bold')
+    vm2_logs = [file for file in mlogs if 'vm2' in file and 'multicast_5_' in file]
+    for log in vm2_logs:
+        # df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        df = pd.DataFrame.from_dict(get_network_data(log, 'megabytes'), orient='index')
+        df = df.transpose()
+        if 'run_1' in log:  
+            row1['vm2'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm2'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm2'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm2'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm2'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm2'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm2'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm2'].set_xlim(xmin=0, xmax=450)
+    row1['vm2'].set_ylim(ymin=0)
+
+    row1['vm3'].title.set(text="Network Send/Receive Rate for VM 3 \n Over Increasing Time Per Every 2 Seconds (19P + 19S)", fontsize=15, fontweight='bold')
+    vm3_logs = [file for file in mlogs if 'vm3' in file and 'multicast_5_' in file]
+    for log in vm3_logs:
+        df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        if 'run_1' in log:  
+            row1['vm3'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm3'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm3'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm3'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm3'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm3'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    lines = [
+        Line2D([0], [0], linewidth=2, color=greens[0]),
+        Line2D([0], [0], linewidth=2, color=blues[0]),
+        Line2D([0], [0], linewidth=2, color=reds[0]),
+        Line2D([0], [0], linewidth=2, ls="--", color='orange'),
+        Line2D([0], [0], linewidth=2, color='orange')
+    ]
+    # row1['vm3'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm3'].set_xlim(xmin=0, xmax=450)
+    row1['vm3'].set_ylim(ymin=0)
+
+    row1['vm4'].title.set(text="Network Send/Receive Rate for VM 4 \n Over Increasing Time Per Every 2 Seconds (18P + 19S)", fontsize=15, fontweight='bold')
+    vm4_logs = [file for file in mlogs if 'vm4' in file and 'multicast_5_' in file]
+    for log in vm4_logs:
+        # df = pd.DataFrame(get_network_data(log, 'megabytes'))
+        df = pd.DataFrame.from_dict(get_network_data(log, 'megabytes'), orient='index')
+        df = df.transpose()
+        if 'run_1' in log:  
+            row1['vm4'].plot(df['send_rates'], color=greens[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=greens[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=greens[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=greens[0], marker="|")
+        elif 'run_2' in log:
+            row1['vm4'].plot(df['send_rates'], color=blues[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=blues[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=blues[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=blues[0], marker="|")
+        elif 'run_3' in log:
+            row1['vm4'].plot(df['send_rates'], color=reds[0], ls="--")
+            # row1['vm4'].scatter(df['send_rates'].index, df['send_rates'], color=reds[0], ls="--", marker="_")
+            row1['vm4'].plot(df['receive_rates'], color=reds[0])
+            # row1['vm4'].scatter(df['receive_rates'].index, df['receive_rates'], color=reds[0], marker="|")
+    # row1['vm4'].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+    row1['vm4'].set_xlim(xmin=0, xmax=450)
+    row1['vm4'].set_ylim(ymin=0)
+
+    # lines = [
+    #     Line2D([0], [0], linewidth=2, color=greens[0]),
+    #     Line2D([0], [0], linewidth=2, color=blues[0]),
+    #     Line2D([0], [0], linewidth=2, color=reds[0]),
+    #     Line2D([0], [0], linewidth=0, marker="_", color='black'),
+    #     Line2D([0], [0], linewidth=0, marker="|", color='black')
+    # ]
+    for row in row1:
+        if 'vm' in row:
+            row1[str(row)].set_xlabel("Increasing Time In 2s Increments(s)")
+            row1[str(row)].set_ylabel("Send/Receive Rate (MBps)")
+            row1[str(row)].legend(lines, ['Run 1', 'Run 2', 'Run 3', 'Send Rate', 'Receive Rate'])
+
+    plt.tight_layout(pad=3)
+
+def s2_plot_summary_table(ax, ucast, mcast):
+    # Get unicast latency files
+    testname = ["", "", "", get_test_names([ucast])[0].replace("Unicast ", ""), "", "", ""]
+    headings = ["", "", "Unicast", "", "", "Multicast", ""]
+    runs = ["Runs", 1, 2, 3, 1, 2, 3]
+    metric_count = ["No. of Measurements".title()]
+    averages = ["averages".title()]
+    stds = ["stds".title()]
+    variances = ["variances".title()]
+    mins = ["mins".title()]
+    maxs = ["maxs".title()]
+    lower_quartiles = ["lower_quartiles".title().replace("_", " ")]
+    mid_quartiles = ["mid_quartiles".title().replace("_", " ")]
+    upper_quartiles = ["upper_quartiles".title().replace("_", " ")]
+
+    df = pd.read_csv(ucast)
+    for col in df.columns[1:4]:
+        metric_count.append(format_number(df[col].count()))
+        averages.append(format_number(df[col].mean()))
+        stds.append(format_number(df[col].std()))
+        variances.append(format_number(df[col].var()))
+        mins.append(format_number(df[col].min()))
+        maxs.append(format_number(df[col].max()))
+        lower_quartiles.append(format_number(df[col].quantile(.25)))
+        mid_quartiles.append(format_number(df[col].quantile(.5)))
+        upper_quartiles.append(format_number(df[col].quantile(.75)))
+
+    df = pd.read_csv(mcast)
+    for col in df.columns[1:4]:
+        metric_count.append(format_number(df[col].count()))
+        averages.append(format_number(df[col].mean()))
+        stds.append(format_number(df[col].std()))
+        variances.append(format_number(df[col].var()))
+        mins.append(format_number(df[col].min()))
+        maxs.append(format_number(df[col].max()))
+        lower_quartiles.append(format_number(df[col].quantile(.25)))
+        mid_quartiles.append(format_number(df[col].quantile(.5)))
+        upper_quartiles.append(format_number(df[col].quantile(.75)))
+
+    rows = [headings, runs, metric_count, averages, stds, variances, mins, maxs, lower_quartiles, mid_quartiles, upper_quartiles]
+
+    # Get summary data for unicast per run
+    
+    table = plot_table(ax, testname, rows)
+    table.auto_set_font_size(False)
+    table.set_fontsize(4)
+    for key, cell in table.get_celld().items():
+        cell.set_linewidth(0)
+
+def s2_plot_latency_summary_tables():
+    ucast = [file for file in get_files('data/set_2') if 'average_latencies' in file and 'forced_transport' in file and 'unicast' in file]
+    mcast = [file for file in get_files('data/set_2') if 'average_latencies' in file and 'forced_transport' in file and 'multicast' in file]
+    ucast.sort()
+    mcast.sort()
+    mcast = mcast[1:] + mcast[:1]
+
+    for i in range(0, len(ucast)):
+        plot_lat_summary_table([ucast[i]])
+        plot_lat_summary_table([mcast[i]])
+
+def s2_24hr15m_cdf_comparison():
+    avg_lat_24hr = [file for file in get_files("data/set_2") if '24_hours' in file and 'average_latencies' in file]
+    avg_lat_15min = [file for file in get_files("data/set_2") if ('2_9_' in file or '2_10_' in file) and 'average_latencies' in file]
+
+    fig = plt.figure(figsize=(30, 10))
+    grid = plt.GridSpec(1, 2, figure=fig)
+
+    left = plt.subplot(grid[0])
+    right = plt.subplot(grid[1])
+
+    fig.suptitle("Set 2 24-Hour vs 15-Minute Run Latency CDF Comparison", fontsize=15, fontweight="bold")
+    left.set_title(label="15-Minute Run CDFs Per Run", fontsize=15, fontweight='bold')
+    right.set_title(label="24-Hour Run CDFs Per Run", fontsize=15, fontweight='bold')
+
+    for file in avg_lat_15min:
+        df = pd.read_csv(file)
+        color = greens[0] if 'unicast' in file else reds[0]
+        title = "Unicast Average" if 'unicast' in file else "Multicast Average"
+        try:
+            plot_cdf("", df["run_1_latency"], left, color, "normal")
+        except:
+            print(df.head())
+        plot_cdf("", df["run_2_latency"], left, color, "normal")
+        plot_cdf("", df["run_3_latency"], left, color, "normal")
+        try:
+            plot_cdf(title, pd.concat([df["run_1_latency"], df["run_2_latency"], df["run_3_latency"]]), left, color, "average")
+        except:
+            print(df.head())
+
+    for file in avg_lat_24hr:
+        df = pd.read_csv(file)
+        color = greens[0] if 'unicast' in file else reds[0]
+        title = "Unicast Average" if 'unicast' in file else "Multicast Average"
+        try:
+            plot_cdf("", df["run_1_latency"], right, color, "normal")
+        except:
+            None
+        plot_cdf("", df["run_2_latency"], right, color, "normal")
+        plot_cdf("", df["run_3_latency"], right, color, "normal")
+        try:
+            plot_cdf(title, pd.concat([df["run_1_latency"], df["run_2_latency"], df["run_3_latency"]]), right, color, "average")
+        except:
+            plot_cdf(title, pd.concat([df["run_2_latency"], df["run_3_latency"]]), right, color, "average")
+
+    left.set_ylim(ymin=0, ymax=1)
+    right.set_ylim(ymin=0, ymax=1)
+
+    left.set_xlim(xmin=0, xmax=500000)
+    right.set_xlim(xmin=0, xmax=500000)
+
+    left.set_xlabel("Latency ($\mu$s)", fontsize=12, fontweight="bold")
+    right.set_xlabel("Latency ($\mu$s)", fontsize=12, fontweight="bold")
+
+    left.grid()
+    right.grid()
+
+    left.legend()
+    right.legend()
+
+    plt.tight_layout(pad=2)
+
+def s2_24hr15m_cdf_comparison_single_plot():
+    avg_lat_24hr = [file for file in get_files("data/set_2") if '24_hours' in file and 'average_latencies' in file][0]
+    avg_lat_15min = [file for file in get_files("data/set_2") if '2_9_' in file and 'average_latencies' in file][0]
+
+    fig = plt.figure(figsize=(30, 10))
+    grid = plt.GridSpec(1, 2, figure=fig)
+
+    left = plt.subplot(grid[0])
+    right = plt.subplot(grid[1])
+
+    fig.suptitle("Set 2 24-Hour vs 15-Minute Average vs Run Latency CDF Comparison (Unicast)", fontsize=15, fontweight="bold")
+    left.set_title(label="CDFs Of Averages of 15-Minute vs 24-Hour Runs", fontsize=15, fontweight='bold')
+    right.set_title(label="CDFs Of All 6 Runs", fontsize=15, fontweight='bold')
+
+    df_15 = pd.read_csv(avg_lat_15min)
+    df_24 = pd.read_csv(avg_lat_24hr)
+
+    plot_cdf("15-Minute Run Average", pd.concat([df_15["run_1_latency"], df_15["run_2_latency"], df_15["run_3_latency"]]), left, greens[0], "average")
+    plot_cdf("24-Hour Run Average", pd.concat([df_24["run_1_latency"], df_24["run_2_latency"], df_24["run_3_latency"]]), left, reds[0], "average")
+
+    plot_cdf("15-Minute Test", df_15["run_1_latency"], right, greens[0], "normal")
+    plot_cdf("", df_15["run_2_latency"], right, greens[0], "normal")
+    plot_cdf("", df_15["run_3_latency"], right, greens[0], "normal")
+    plot_cdf("24-Hour Test", df_24["run_1_latency"], right, reds[0], "normal")
+    plot_cdf("", df_24["run_2_latency"], right, reds[0], "normal")
+    plot_cdf("", df_24["run_3_latency"], right, reds[0], "normal")
+
+    left.set_ylim(ymin=0, ymax=1)
+    right.set_ylim(ymin=0, ymax=1)
+
+    left.set_xlim(xmin=0, xmax=500000)
+    right.set_xlim(xmin=0, xmax=500000)
+
+    left.set_xlabel("Latency ($\mu$s)", fontsize=12, fontweight="bold")
+    right.set_xlabel("Latency ($\mu$s)", fontsize=12, fontweight="bold")
+
+    left.grid()
+    right.grid()
+
+    left.legend()
+    right.legend()
+
+    plt.tight_layout(pad=2)
+
+def get_percent_diff(current, previous):
+    return ((float(current) - previous) / previous) * 100
+
+def plot_mini_cdf(ax, title, ddos_size, normal_files, ddos_files):
+    ax.set_title(label=title, fontsize=12, fontweight="bold")
+    for file in ddos_files[ddos_size]:
+        df = pd.read_csv(file)
+        if 'run_1_latency' in df and 'run_2_latency' in df and 'run_3_latency' in df:
+            combined_df = pd.concat([ df["run_1_latency"], df["run_2_latency"], df["run_3_latency"] ])
+        else:
+            combined_df = df['avg_run_latency']
+        if 'unicast' in file:
+            # plot_cdf('', df["run_1_latency"], ax, greens[0], 'normal')
+            # plot_cdf('', df["run_2_latency"], ax, greens[0], 'normal')
+            # plot_cdf('', df["run_3_latency"], ax, greens[0], 'normal')
+            plot_cdf(ddos_size.upper() + " DDOS Unicast DDS Latency", combined_df, ax, greens[0], 'average')
+            ax.text(50000, (combined_df.mean() / 200000), "Avg.: " + format_number(combined_df.mean()) + "$\mu$s", color=greens[0], backgroundcolor='white', fontweight='bold', fontsize=10)
+            ax.annotate('', (60000, (combined_df.mean() / 200000)), (60000, 25934/200000), arrowprops={"arrowstyle": "->", "color": greens[0]})
+            ax.text(40000, 0.2, "+" + format_number(get_percent_diff(combined_df.mean(), 25934)) + "%", fontweight='bold', color=greens[0])
+        else:
+            # plot_cdf('', df["run_1_latency"], ax, reds[0], 'normal')
+            # plot_cdf('', df["run_2_latency"], ax, reds[0], 'normal')
+            # plot_cdf('', df["run_3_latency"], ax, reds[0], 'normal')
+            plot_cdf(ddos_size.upper() + " DDOS Multicast DDS Latency", combined_df, ax, reds[0], 'average')
+            ax.text(90000, (combined_df.mean() / 200000), "Avg.: " + format_number(combined_df.mean()) + "$\mu$s", color=reds[0], backgroundcolor='white', fontweight='bold', fontsize=10)
+            ax.annotate('', (100000, (combined_df.mean() / 200000)), (100000, 29149/200000), arrowprops={"arrowstyle": "->", "color": reds[0]})
+            ax.text(80000, 0.2, "+" + format_number(get_percent_diff(combined_df.mean(), 29149)) + "%", fontweight='bold', color=reds[0])
+
+    for file in normal_files:
+        df = pd.read_csv(file)
+        combined_df = pd.concat([ df["run_1_latency"], df["run_2_latency"], df["run_3_latency"] ])
+        if 'unicast' in file:
+            plot_cdf('Normal Unicast DDS Latency', combined_df, ax, blues[0], 'average')
+            ax.text(50000, (combined_df.mean() / 200000), "Avg.: " + format_number(combined_df.mean()) + "$\mu$s", color=blues[0], backgroundcolor='white', fontweight='bold', fontsize=10)
+        else:
+            plot_cdf('Normal Multicast DDS Latency', combined_df, ax, oranges[0], 'average')
+            ax.text(90000, (combined_df.mean() / 200000), "Avg.: " + format_number(combined_df.mean()) + "$\mu$s", color=oranges[0], backgroundcolor='white', fontweight='bold', fontsize=10)
+
+def s3_plot_ddos_latency_cdf_comparison():
+    """
+    Get data for normal test (non-attack)
+    """
+    normal_files = [file for file in get_files("data/set_2") if 'average_latencies' in file and 'forced_transport' in file and ('unicast_2_' in file or 'multicast_2_' in file)]
+
+    """
+    Get data for ddos test
+    """
+    all_ddos_files = [file for file in get_files("data/set_3") if 'average_latencies' in file and ('unicast_2_' in file or 'multicast_2_' in file)]
+    ddos_files = {
+        "1mb": [file for file in all_ddos_files if '1024_kilobyte' in file],
+        "512kb": [file for file in all_ddos_files if '512_kilobyte' in file],
+        "128kb": [file for file in all_ddos_files if '128_kilobyte' in file],
+        "64kb": [file for file in all_ddos_files if '64_kilobyte' in file],
+        "16kb": [file for file in all_ddos_files if '16_kilobyte' in file]
+    }
+
+    fig = plt.figure(figsize=(30, 15))
+    fig.suptitle("DDOS Latency CDF Comparison", fontsize=15, fontweight='bold')
+    grid = plt.GridSpec(3, 3, figure=fig)
+
+    combined = plt.subplot(grid[0:2,0:2])
+    bot_left = plt.subplot(grid[2, 0])
+    bot_mid = plt.subplot(grid[2, 1])
+    top_right = plt.subplot(grid[0, 2])
+    top_mid = plt.subplot(grid[1, 2])
+    bot_right = plt.subplot(grid[2, 2])
+
+    all = [combined, bot_left, bot_right, bot_mid, top_right, top_mid]
+
+    """
+    Plot combined latency graph
+    """
+    combined.set_title(label="Latency CDFs Combined", fontsize=12, fontweight='bold')
+    combined.set_xlim(xmin=0, xmax=200000)
+    for type in ddos_files:
+        for file in ddos_files[type]:
+            df = pd.read_csv(file)
+            if '16_kilobyte' in file:
+                title = "DDOS Latency"
+            else:
+                title = ""
+
+            if 'unicast' in file:
+                title = title + " Unicast" if len(title) > 0 else ""
+                plot_cdf(title, pd.concat([ df["run_1_latency"], df["run_2_latency"], df["run_3_latency"] ]), combined, greens[0], 'average')
+            else:
+                title = title + " Multicast" if len(title) > 0 else ""
+                plot_cdf(title, pd.concat([ df["run_1_latency"], df["run_2_latency"], df["run_3_latency"] ]), combined, reds[0], 'average')
+    for file in normal_files:
+        df = pd.read_csv(file)
+        if 'unicast' in file:
+            plot_cdf('Normal Unicast Latency', pd.concat([ df["run_1_latency"], df["run_2_latency"], df["run_3_latency"] ]), combined, blues[0], 'average')
+        else:
+            plot_cdf('Normal Multicast Latency', pd.concat([ df["run_1_latency"], df["run_2_latency"], df["run_3_latency"] ]), combined, oranges[0], 'average')
+
+    plot_mini_cdf(bot_left, "16KB DDOS Latency CDFs Per Run", '16kb', normal_files, ddos_files)
+    plot_mini_cdf(bot_mid, "64KB DDOS Latency CDFs Per Run", '64kb', normal_files, ddos_files)
+    plot_mini_cdf(bot_right, "128KB DDOS Latency CDFs Per Run", '128kb', normal_files, ddos_files)
+    plot_mini_cdf(top_mid, "512KB DDOS Latency CDFs Per Run", '512kb', normal_files, ddos_files)
+    plot_mini_cdf(top_right, "1MB DDOS Latency CDFs Per Run", '1mb', normal_files, ddos_files)
+
+    for ax in all:
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.set_ylim(ymin=0, ymax=1)
+        ax.grid()
+        ax.legend()
+        ax.set_xlabel("Latency ($\mu$s)")
+        ax.set_xlim(xmin=0, xmax=175000)
+
+    plt.tight_layout()
