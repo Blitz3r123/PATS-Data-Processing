@@ -1,9 +1,12 @@
 from contextlib import contextmanager
 from pydoc import describe
+from socket import errorTab
 from matplotlib.style import context
+from inspect import currentframe, getframeinfo
 from rich.jupyter import print
 from rich.markdown import Markdown
 from rich.align import Align
+from rich.panel import Panel
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -67,6 +70,15 @@ with console.status("Checking given file path..."):
         sys.exit()
 
 def get_test_folders():
+    """
+      Scans a directory for all folders and returns the name of these folders
+    
+      Parameters:
+        None
+    
+      Returns:
+        test_folders [string]: Array containing all folder names.
+    """
     test_folders = []
     all_files = os.listdir(file_path)
     for file in all_files:
@@ -77,6 +89,15 @@ def get_test_folders():
     return test_folders
 
 def format_test_titles(test_folders):
+    """
+      Takes folder names and formats them into titles.
+    
+      Parameters:
+        test_folders [string]: Array of all folder names.
+    
+      Returns:
+        new_files_names [string]: Array of new formatted folder names. 
+    """
     new_file_names = []
 
     for file in test_folders:
@@ -93,6 +114,17 @@ def format_test_titles(test_folders):
     return new_file_names
 
 def get_configs(test_folders, config_files, data):
+    """
+      Checks if config file is present, if so then appends True and config_file location, if not, it appends False and empty string to data['config_file']
+    
+      Parameters:
+        test_folders [string]: Array of test_folders
+        config_files [string]: Array of config_files
+        data [too advanced]: Huge data structure containing all information
+    
+      Returns:
+        None 
+    """
     for file in test_folders:
         if file + "_metadata.txt" in config_files:
             data['has_config'].append(True)
@@ -102,9 +134,27 @@ def get_configs(test_folders, config_files, data):
             data["config_files"].append("")
 
 def get_data_runs(test_folders):
+    """
+      Returns the amount of run_n folders within the test folders for each test.
+    
+      Parameters:
+        test_folders [string]: Array of test_folders.
+    
+      Returns:
+         runs_per_test [int]: Array containing the numbers of run_n folders for each test within test_folders.
+    """
     return [len([file for file in os.listdir(file) if '.csv' not in file and 'run_' in file]) for file in test_folders]
 
 def get_config_runs_and_participants(data):
+    """
+      Read the config file per test and store its pub/sub and mal_pub/mal_sub counts as well as how many runs there were.
+    
+      Parameters:
+        data [too advanced]: Single huge data structure containing all information.
+    
+      Returns:
+        None 
+    """
     for file in data['config_files']:
         if len(file) > 0:
             with open(file.replace("[green]", "").replace("[/green]", ""), "r") as f:
@@ -193,6 +243,31 @@ def get_run_participants(data):
 
         data['run_participants'].append(runs_arr)
 
+def get_total_test_durations(data):
+    for i in range(len(data['config_files'])):
+        config_file = data['config_files'][i]
+        has_config = data['has_config'][i]
+
+        if has_config:
+            with open(config_file, "r") as f:
+                file_contents = f.readlines()
+                try:
+                    test_duration = [line for line in file_contents if "Duration" in line]
+                    if len(test_duration) > 0:
+                        test_duration = test_duration[0]
+                        test_duration = test_duration.replace("Test Duration: ", "")
+                        test_duration = test_duration.split(".")[0]
+                    else:
+                        test_duration = "-"
+                except Exception as e:
+                    print("Error on line " + str(getframeinfo(currentframe()).lineno) + ": ")
+                    print(e)
+                    test_duration = "-"
+        else:
+            test_duration = "-"
+
+        data['total_test_durations'].append(test_duration)
+
 def main():
     """
     1. List tests in a table format
@@ -213,7 +288,8 @@ def main():
         "mal_sub_count": [],
         "pub_count": [],
         "mal_pub_count": [],
-        "run_participants": [], 
+        "run_participants": [],
+        "total_test_durations": [],
         "errors": []
     }
 
@@ -238,6 +314,8 @@ def main():
 
     get_run_participants(data)
 
+    get_total_test_durations(data)
+
     """
     Identify all errors and add to data['errors'].
     Errors:
@@ -260,6 +338,12 @@ def main():
         6.1. Config participants > test result participants
             - Missing test data
         6.2. Config participants < test result participants
+            - HUH?!
+    7. Test duration hasn't been calculated in the config file.
+        - Test has probably been interrupted and there is no test end
+        7.1. Test Start exists but Test End doesn't
+            - Test has been interrupted and didn't complete properly
+        7.2. Test End exists but Test Start doesn't
             - HUH?!
     """
     for i in range(len(data['test_files'])):
@@ -302,26 +386,53 @@ def main():
                 if len(run) > 0:
                     if not (run['pub_count'] + run['mal_pub_count'] == data['pub_count'][i] + data['mal_pub_count'][i]):
                         error = error + "\nPublisher amount mismatch for Run " + str(runs_arr.index(run) + 1)  + " results."
-                        # print(run['pub_count'], run['mal_pub_count'], data['pub_count'][i], data['mal_pub_count'][i])
 
                     if not (run['sub_count'] + run['mal_sub_count'] == data['sub_count'][i] + data['mal_sub_count'][i]):
                         error = error + "\nSubscriber amount mismatch for Run " + str(runs_arr.index(run) + 1)  + " results."
-                        # print(run['sub_count'], run['mal_sub_count'], data['sub_count'][i], data['mal_sub_count'][i])
+
+            # 7. Test duration hasn't been calculated in the config file
+            test_duration = data['total_test_durations'][i]
+            config_file = data['config_files'][i]
+            
+            if test_duration == "-":
+                error = error + "\nTest Duration not seen in config file:\n[blue on black]" + config_file + "[/blue on black]"
+
+            with open(config_file, "r") as f:
+                file_contents = f.readlines()
+                test_start_lines = [line for line in file_contents if "Test Start" in line]
+                test_end_lines = [line for line in file_contents if "Test End" in line]
+                # 7.1. Test Start exists but Test End doesn't
+                if len(test_start_lines) > 0 and len(test_end_lines) == 0:
+                    test_start = test_start_lines[0].split(" ")[3]
+                    error = error + "\n\tTest Start found to be " + str(test_start) + " but there is no Test End..."
+                elif len(test_start_lines) == 0 and len(test_end_lines) > 0:
+                    error = error + "\n\tHUH?! There is a Test End but no Test Start in the config file. How has that happened?!"
 
         data['errors'][i] = error
+
+    """
+    Create errors table
+    """
+    error_table = Table(show_header = True, header_style = "bold red", show_lines = True)
+    error_table.add_column("Test", no_wrap=False)
+    error_table.add_column("Errors", no_wrap=False)
+    for i in range(len(data['test_files'])):
+        test_name = data['test_names'][i]
+        error = data['errors'][i]
+        if not error == "":
+            error_table.add_row(test_name, error)
 
     """
     Construct the table
     """
     table = Table(show_header = True, header_style = "bold white", show_lines = True)
-    table_centered = Align.center(table)
     table.add_column("Test", no_wrap=False)
-    # table.add_column("File Name", no_wrap=False)
     table.add_column("Has\nConfig", no_wrap=False)
     table.add_column("Config\nRuns", no_wrap=False)
     table.add_column("Data\nRuns", no_wrap=False)
     table.add_column("Config\nParticipants", no_wrap=False)
     table.add_column("Data\nParticipants", no_wrap=False)
+    table.add_column("Total\nTest\nDurations\nhr : m : s", no_wrap=False)
     
     # with Live(table_centered, console=console, screen=False, refresh_per_second=20):
     for i in range(len(data['test_files'])):
@@ -365,16 +476,20 @@ def main():
 
                 participants_data = participants_data + "[bold underline]Run " + str(run['run_n']) + ":[/bold underline]\n[green]" + str(run['sub_count']) + "S[/green]\t[green]" + str(run['pub_count']) + "P[/green]\n[red]" + str(run['mal_sub_count']) + "S[/red]\t[red]" + str(run['mal_pub_count']) + "P[/red]\n------------\n" + total_sub_count_output + "\t" +total_pub_count_output+ "\n\n"
 
-            table.add_row(test_name, has_config, runs, run_folder_count, participants, participants_data)
+            test_durations = data['total_test_durations'][i]
+
+            table.add_row(test_name, has_config, runs, run_folder_count, participants, participants_data, test_durations)
         else:
             try:
                 runs = str(data['config_runs'][i])
             except Exception as e:
+                print("Error on line " + str(getframeinfo(currentframe()).lineno) + ": ")
                 print(e)
                 runs = "-"
             try:
                 run_folder_count = str(data['data_runs'][i])
             except Exception as e:
+                print("Error on line " + str(getframeinfo(currentframe()).lineno) + ": ")
                 print(e)
                 run_folder_count = "-"
             try:
@@ -385,6 +500,7 @@ def main():
 
                 participants = "[green]" +str(sub_count)+ "S[/green]\t[red]" +str(pub_count)+ "P[/red]\n[green]" +str(mal_sub_count)+ "S[/green]\t[red]" +str(mal_pub_count)+ "P[/red]\n------------\n" + str(sub_count + mal_sub_count) + "S\t" + str(pub_count + mal_pub_count) + "P"
             except Exception as e:
+                print("Error on line " + str(getframeinfo(currentframe()).lineno) + ": ")
                 print(e)
                 participants = "-"
             try:
@@ -408,16 +524,22 @@ def main():
 
                     participants_data = participants_data + "[bold underline]Run " + str(run['run_n']) + ":[/bold underline]\n[green]" + str(run['sub_count']) + "S[/green]\t[green]" + str(run['pub_count']) + "P[/green]\n[red]" + str(run['mal_sub_count']) + "S[/red]\t[red]" + str(run['mal_pub_count']) + "P[/red]\n------------\n" + total_sub_count_output + "\t" +total_pub_count_output+ "\n\n"
             except Exception as e:
+                print("Error on line " + str(getframeinfo(currentframe()).lineno) + ": ")    
                 print(e)                        
                 participants_data = "-"
+
+            test_durations = data['total_test_durations'][i]
 
             comments = data["errors"][i]
             
             if i == 0:
                 table.add_column("Comments", no_wrap=False)
-            table.add_row(test_name, has_config, runs, run_folder_count, participants, participants_data, comments, style="bold #003f5c on #ffa600")
+            table.add_row(test_name, has_config, runs, run_folder_count, participants, participants_data, test_durations, comments, style="bold #003f5c on #ffa600")
 
-    # console.print(table)
+    console.print(Markdown("# All Tests"), style="")
+    console.print(table)
+    console.print(Markdown("# All Errors"), style="")
+    console.print(error_table)
     # console.print(data)
 
     # Output to analysis.html too
