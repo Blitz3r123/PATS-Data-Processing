@@ -314,11 +314,11 @@ def main():
     table_centered = Align.center(table)
     table.add_column("Test", no_wrap=False)
     # table.add_column("File Name", no_wrap=False)
-    table.add_column("Config", no_wrap=False)
-    table.add_column("Runs", no_wrap=False)
-    table.add_column("Run\nData\nFolders", no_wrap=False)
-    table.add_column("Participants", no_wrap=False)
-    table.add_column("Participants\nData", no_wrap=False)
+    table.add_column("Has\nConfig", no_wrap=False)
+    table.add_column("Config\nRuns", no_wrap=False)
+    table.add_column("Data\nRuns", no_wrap=False)
+    table.add_column("Config\nParticipants", no_wrap=False)
+    table.add_column("Data\nParticipants", no_wrap=False)
     
     # with Live(table_centered, console=console, screen=False, refresh_per_second=20):
     for i in range(len(data['test_files'])):
