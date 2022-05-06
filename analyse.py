@@ -106,6 +106,9 @@ def get_configs(test_folders, config_files, data):
             data['has_config'].append(False)
             data["config_files"].append("")
 
+def get_data_runs(test_folders):
+    return [len([file for file in os.listdir(file) if '.csv' not in file and 'run_' in file]) for file in test_folders]
+
 def main():
     """
     1. List tests in a table format
@@ -143,12 +146,7 @@ def main():
 
     data['test_files'] = test_folders
     data['test_names'] = new_file_names
-
-    """
-    Calculate how many run_n folders there are
-    """
-    for file in data['test_files']:
-        data['data_runs'].append(len([file for file in os.listdir(file) if '.csv' not in file and 'run_' in file]))
+    data['data_runs'] = get_data_runs(test_folders)
 
     """
     Calculate how many runs were configured
