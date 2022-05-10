@@ -395,7 +395,7 @@ def main():
             config_file = data['config_files'][i]
             
             if test_duration == "-":
-                error = error + "\nTest Duration not seen in config file:\n[blue on black]" + config_file + "[/blue on black]"
+                error = error + "\nTest Duration not seen in config file:\n[white on black]" + config_file + "[/white on black]"
 
             with open(config_file, "r") as f:
                 file_contents = f.readlines()
@@ -546,5 +546,5 @@ def main():
     with open("analysis.html", "w", encoding='utf-8') as f:
         f.write(console.export_html())
 
-with console.status("Analysing data..."):
-    main()
+# with console.status("Analysing data..."):
+main()
