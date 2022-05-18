@@ -16,6 +16,7 @@ import plotly.graph_objects as go
 import re
 import sys
 import time
+import datetime
 from statistics import *
 
 from rich.console import Console
@@ -45,6 +46,19 @@ def get_files(dir_path):
                 
     return all_files
 
+def convert_to_secs(time_string):
+    """
+      Converts hh:mm:ss to seconds.
+    
+      Parameters:
+        time_string (string): String value of the time in the format hh:mm:ss.
+    
+      Returns:
+        time_in_seconds (int): Number of seconds 
+    """
+    x = time.strptime(time_string,'%H:%M:%S')
+    return int(datetime.timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds())
+
 def get_nums_from_string(text):
     """
       Gets numbers from a string.
@@ -57,17 +71,17 @@ def get_nums_from_string(text):
     """
     return [int(s) for s in re.findall(r'\d+', text)]
 
-with console.status("Checking given file path..."):
-    if len(sys.argv) > 1 and sys.argv[1] and isinstance(sys.argv[1], str):
-        file_path = sys.argv[1]
-    else:
-        console.print("Path for data folder not specified. Using /data.", style="bold red")
-        file_path = "data"
+# with console.status("Checking given file path..."):
+if len(sys.argv) > 1 and sys.argv[1] and isinstance(sys.argv[1], str):
+    file_path = sys.argv[1]
+else:
+    console.print("Path for data folder not specified. Using /data.", style="bold red")
+    file_path = "data"
 
-    # Check if file_path exists
-    if not os.path.exists(file_path):
-        console.print("❎ The path \n[white]" + file_path + "[/white]\ndoes not exist.", style="bold red")
-        sys.exit()
+# Check if file_path exists
+if not os.path.exists(file_path):
+    console.print("❎ The path \n[white]" + file_path + "[/white]\ndoes not exist.", style="bold red")
+    sys.exit()
 
 def get_test_folders():
     """
@@ -345,6 +359,8 @@ def main():
             - Test has been interrupted and didn't complete properly
         7.2. Test End exists but Test Start doesn't
             - HUH?!
+    8. Test duration doesn't match duration set in config
+        - Very weird...
     """
     for i in range(len(data['test_files'])):
         error = ""
@@ -355,25 +371,25 @@ def main():
             # 2. 0 runs.
             if int(data["config_runs"][i]) == 0:
                 error = error + "\n0 runs recorded from config file. It's probably the case that no restarts have been recorded."
-                error = error + "\n\tConfig file can be found at:"
-                error = error + "\n\t" + data["config_files"][i]
+                # error = error + "\n\tConfig file can be found at:"
+                # error = error + "\n\t" + data["config_files"][i]
             
             # 3. Config run and run_n folder mismatch.
             if not (data["config_runs"][i] == data["data_runs"][i]):
                 error = error + "\nMismatch between config run amount and run_n folders."
-                if len(data["data_runs"][i]) < data["config_runs"][i]:
+                if data["data_runs"][i] < data["config_runs"][i]:
                     error = error + "\n\tTest hasn't completed all runs. Missing run_n folders."
-                    error = error + "\n\tResults contain " +str(len(data["data_runs"][i]))+ "/" +str(data["config_runs"][i])+ " runs."
+                    error = error + "\n\tResults contain " +str(data["data_runs"][i])+ "/" +str(data["config_runs"][i])+ " runs."
                 else:
                     error = error + "\n\tHUH?! What happened here? How has this happened???"
-                    error = error + "\n\tResults contain " +str(len(data["data_runs"][i]))+ "/" +str(data["config_runs"][i])+ " runs."
+                    error = error + "\n\tResults contain " +str(data["data_runs"][i])+ "/" +str(data["config_runs"][i])+ " runs."
                     error = error + "\n\tYeah...somehow...there is more run data than configured runs...."
 
             # 4. Can't read run amount from config.
             if data["config_runs"][i] == 0:
                 error = error + "\nCouldn't read run amount from config."
                 error = error + "\n\tConfig file is corrupted or incomplete or something else is wrong with it:"
-                error = error + "\n\t" + data["config_files"][i]
+                # error = error + "\n\t" + data["config_files"][i]
 
             # 5. Participant amount == 0 from config.
             if data["pub_count"][i] == 0 and data["sub_count"][i] == 0 and data["mal_pub_count"][i] == 0 and data["mal_sub_count"][i] == 0:
@@ -395,7 +411,7 @@ def main():
             config_file = data['config_files'][i]
             
             if test_duration == "-":
-                error = error + "\nTest Duration not seen in config file:\n[white on black]" + config_file + "[/white on black]"
+                error = error + "\nTest Duration not seen in config file."
 
             with open(config_file, "r") as f:
                 file_contents = f.readlines()
@@ -404,9 +420,47 @@ def main():
                 # 7.1. Test Start exists but Test End doesn't
                 if len(test_start_lines) > 0 and len(test_end_lines) == 0:
                     test_start = test_start_lines[0].split(" ")[3]
-                    error = error + "\n\tTest Start found to be " + str(test_start) + " but there is no Test End..."
+                    error = error + "\n\tTest Start found to be " + str(test_start) + " \tbut there is no Test End..."
+
+                    restart_lines = [line for line in file_contents if "Restart VM" in line]
+
+                    error = error + "\n\t\tVM 1 restarted " + str(len([line for line in restart_lines if "10.200.51.21" in line])) + " time(s)."
+                    error = error + "\n\t\tVM 2 restarted " + str(len([line for line in restart_lines if "10.200.51.22" in line])) + " time(s)."
+                    error = error + "\n\t\tVM 3 restarted " + str(len([line for line in restart_lines if "10.200.51.23" in line])) + " time(s)."
+                    error = error + "\n\t\tVM 4 restarted " + str(len([line for line in restart_lines if "10.200.51.24" in line])) + " time(s)."
+
                 elif len(test_start_lines) == 0 and len(test_end_lines) > 0:
                     error = error + "\n\tHUH?! There is a Test End but no Test Start in the config file. How has that happened?!"
+
+            # 8. Test duration doesn't match duration set in config
+            with open(config_file, 'r') as f:
+                content = f.readlines()
+                execution_times = []
+                for line in content:
+                    if '-executionTime' in line:
+                        for time in [item for item in line.split(" -") if "executionTime" in item]:
+                            execution_times.append(get_nums_from_string(time)[0])
+
+            # Make sure all execution_times match
+            no_dupe_execution_times = list(dict.fromkeys(execution_times))
+            if len(no_dupe_execution_times) > 1:
+                error = error + "\nThe -executionTime amounts do NOT match."
+                error = error + "\n\t" + str(len(no_dupe_execution_times)) + " values have been seen: "
+                error = error + "\n\t"
+                for time in no_dupe_execution_times:
+                    error = error + str(time) + " "
+            else:
+                config_duration = no_dupe_execution_times[0]
+                actual_duration = convert_to_secs(test_duration)
+                config_duration_hours = config_duration // 3600
+                actual_duration_hours = actual_duration // 3600
+
+                if config_duration_hours != actual_duration_hours:
+                    error = error + "\nConfig duration and actual test duration do NOT match:"
+                    error = error + "\n\tConfig Duration: " + str(datetime.timedelta(seconds=config_duration))
+                    error = error + "\n\tActual Duration: " + str(datetime.timedelta(seconds=actual_duration))
+
+            execution_times = []
 
         data['errors'][i] = error
 
@@ -480,6 +534,10 @@ def main():
 
             table.add_row(test_name, has_config, runs, run_folder_count, participants, participants_data, test_durations)
         else:
+            
+            if "\n" in error[0:3]:
+                error[0:3].replace("\n", "", 1)
+
             try:
                 runs = str(data['config_runs'][i])
             except Exception as e:
