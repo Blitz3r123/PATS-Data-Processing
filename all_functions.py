@@ -373,7 +373,16 @@ def plot_lat_summary_table(latency_files):
             "maxs": []
         }
 
-        for col in df.columns[1:4]:
+        run_columns = (df.columns[1:len(df.columns) - 3])
+        run_text = []
+
+        colours = [greens[0], oranges[0], reds[0], blues[0]]
+        cellColour = []
+
+        for i in range(len(run_columns)):
+            col = run_columns[i]
+            run_text.append("Run " + str(i + 1))
+            cellColour.append(colours[i])
             stats["counts"].append(format_number(df[col].count()))
             stats["means"].append(format_number(df[col].mean()))
             stats["stds"].append(format_number(df[col].std()))
@@ -383,26 +392,18 @@ def plot_lat_summary_table(latency_files):
             stats["75s"].append(format_number(df[col].quantile(.75)))
             stats["maxs"].append(format_number(df[col].max()))
 
-        cellColour = [
-            greens[0],
-            oranges[0],
-            reds[0]
-        ]
-
         cellColours = [cellColour, cellColour, cellColour, cellColour, cellColour, cellColour, cellColour, cellColour, cellColour]
 
         table = ax.table(
-            cellText=[ ["Run 1", "Run 2", "Run 3"], stats["counts"], stats["means"], stats["stds"], stats["mins"], stats["25s"], stats["50s"], stats["75s"], stats["maxs"],],
+            cellText=[ run_text, stats["counts"], stats["means"], stats["stds"], stats["mins"], stats["25s"], stats["50s"], stats["75s"], stats["maxs"],],
             cellColours = cellColours,
             cellLoc='center',
             rowLabels=["Run", "Count", "Mean", "Standard Deviation", "Min.", "25%", "50%", "75%", "Max"],
             rowLoc='center',
-            colLabels=["", get_test_names([file])[0] + " Latency Summary", ""],
             colLoc='center',
-            loc='center',
-            
+            loc='center'
         )
-
+        ax.set_title(get_test_names([file])[0] + " Latency Summary", fontsize=15)
         table.scale(1, 2)
         table.auto_set_font_size(False)
         table.set_fontsize(15)
@@ -581,7 +582,7 @@ def set2_plot_latency_cdfs():
     ax.text(8000, 0.9, "10P/10S", color="black", backgroundcolor=greens[6], fontsize=12)
     ax.text(30000, 0.5, "25P/25S", color="black", backgroundcolor=greens[6], fontsize=12)
     ax.text(85000, 0.53, "50P/50S", color="black", backgroundcolor=greens[6], fontsize=12)
-    ax.text(140000, 0.3, "75P/75S", color="black", backgroundcolor=greens[6], fontsize=12)
+    # ax.text(140000, 0.3, "75P/75S", color="black", backgroundcolor=greens[6], fontsize=12)
     ax.grid()
     ax.legend()
 
@@ -3029,3 +3030,39 @@ def s3_plot_ddos_latency_cdf_comparison():
         ax.set_xlim(xmin=0, xmax=175000)
 
     plt.tight_layout()
+
+def get_run_count(test):
+  """
+    Calculates how many runs were completed for a test by reading the metadata file.
+  
+    Parameters:
+      test (string): Filepath of test.
+  
+    Returns:
+      run_count (int): Number of runs that the test completed.
+  """
+  metadata_file_list = [f for f in get_files(os.path.dirname(os.path.dirname(test))) if 'metadata' in f and os.path.dirname(test) in f]
+  if metadata_file_list == 0:
+    console.print("No metadata files found for " + test, style="bold red")
+  else:
+    metadata_file = metadata_file_list[0]
+    with open(metadata_file, 'r') as f:
+      content = f.readlines()
+      restart_lines = [line for line in content if 'Restart' in line]
+      restart_counts = {
+        "vm1": 0,
+        "vm2": 0,
+        "vm3": 0,
+        "vm4": 0
+      }
+      for line in restart_lines:
+        if "10.200.51.21" in line:
+            restart_counts["vm1"] = restart_counts["vm1"] + 1
+        elif "10.200.51.22" in line:
+            restart_counts["vm2"] = restart_counts["vm2"] + 1
+        elif "10.200.51.23" in line:
+            restart_counts["vm3"] = restart_counts["vm3"] + 1
+        elif "10.200.51.24" in line:
+            restart_counts["vm4"] = restart_counts["vm4"] + 1
+
+      return (restart_counts[max(restart_counts, key=restart_counts.get)])

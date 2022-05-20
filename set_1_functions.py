@@ -1,43 +1,68 @@
+from tkinter import E
 from all_functions import *
 
 def plot_unicast_tp_cdfs(files, axes):
     for file in files:
         df = pd.read_csv(file)
-        combined_df = pd.concat([ df['run_1_throughput'], df['run_2_throughput'], df['run_3_throughput'] ])
+        try:
+            combined_df = pd.concat([ df['run_1_throughput'], df['run_2_throughput'], df['run_3_throughput'] ])
+        except:
+            try:
+                combined_df = pd.concat([ df['run_2_throughput'], df['run_3_throughput'] ])
+            except:
+                try:
+                    combined_df = pd.concat([ df['run_1_throughput'], df['run_3_throughput'] ])
+                except:
+                    try:
+                        combined_df = pd.concat([ df['run_1_throughput'], df['run_2_throughput'] ])
+                    except Exception as e:
+                        print(e)
         if 'sub_0' in file:
-            plot_cdf('Unicast Sub 0 Run 1', df['run_1_throughput'], axes[0], greens[6], 'normal')
-            plot_cdf('Unicast Sub 0 Run 2', df['run_2_throughput'], axes[0], greens[3], 'normal')
-            plot_cdf('Unicast Sub 0 Run 3', df['run_3_throughput'], axes[0], greens[0], 'normal')
+            # plot_cdf('Unicast Sub 0 Run 1', df['run_1_throughput'], axes[0], greens[6], 'normal')
+            # plot_cdf('Unicast Sub 0 Run 2', df['run_2_throughput'], axes[0], greens[3], 'normal')
+            # plot_cdf('Unicast Sub 0 Run 3', df['run_3_throughput'], axes[0], greens[0], 'normal')
             plot_cdf('Unicast Sub 0 Avg.', combined_df, axes[0], greens[0], 'average')
         elif 'sub_1' in file:
-            plot_cdf('Unicast Sub 1 Run 1', df['run_1_throughput'], axes[1], greens[6], 'normal')
-            plot_cdf('Unicast Sub 1 Run 2', df['run_2_throughput'], axes[1], greens[3], 'normal')
-            plot_cdf('Unicast Sub 1 Run 3', df['run_3_throughput'], axes[1], greens[0], 'normal')
+            # plot_cdf('Unicast Sub 1 Run 1', df['run_1_throughput'], axes[1], greens[6], 'normal')
+            # plot_cdf('Unicast Sub 1 Run 2', df['run_2_throughput'], axes[1], greens[3], 'normal')
+            # plot_cdf('Unicast Sub 1 Run 3', df['run_3_throughput'], axes[1], greens[0], 'normal')
             plot_cdf('Unicast Sub 1 Avg.', combined_df, axes[1], greens[0], 'average')
         elif 'sub_2' in file:
-            plot_cdf('Unicast Sub 2 Run 1', df['run_1_throughput'], axes[2], greens[6], 'normal')
-            plot_cdf('Unicast Sub 2 Run 2', df['run_2_throughput'], axes[2], greens[3], 'normal')
-            plot_cdf('Unicast Sub 2 Run 3', df['run_3_throughput'], axes[2], greens[0], 'normal')
+            # plot_cdf('Unicast Sub 2 Run 1', df['run_1_throughput'], axes[2], greens[6], 'normal')
+            # plot_cdf('Unicast Sub 2 Run 2', df['run_2_throughput'], axes[2], greens[3], 'normal')
+            # plot_cdf('Unicast Sub 2 Run 3', df['run_3_throughput'], axes[2], greens[0], 'normal')
             plot_cdf('Unicast Sub 2 Avg.', combined_df, axes[2], greens[0], 'average')
 
 def plot_multicast_tp_cdfs(files, axes):
     for file in files:
         df = pd.read_csv(file)
-        combined_df = pd.concat([ df['run_1_throughput'], df['run_2_throughput'], df['run_3_throughput'] ])
+        try:
+            combined_df = pd.concat([ df['run_1_throughput'], df['run_2_throughput'], df['run_3_throughput'] ])
+        except:
+            try:
+                combined_df = pd.concat([ df['run_2_throughput'], df['run_3_throughput'] ])
+            except:
+                try:
+                    combined_df = pd.concat([ df['run_1_throughput'], df['run_3_throughput'] ])
+                except:
+                    try:
+                        combined_df = pd.concat([ df['run_1_throughput'], df['run_2_throughput'] ])
+                    except Exception as e:
+                        print(e)
         if 'sub_0' in file:
-            plot_cdf('Multicast Sub 0 Run 1', df['run_1_throughput'], axes[0], reds[6], 'normal')
-            plot_cdf('Multicast Sub 0 Run 2', df['run_2_throughput'], axes[0], reds[3], 'normal')
-            plot_cdf('Multicast Sub 0 Run 3', df['run_3_throughput'], axes[0], reds[0], 'normal')
+            # plot_cdf('Multicast Sub 0 Run 1', df['run_1_throughput'], axes[0], reds[6], 'normal')
+            # plot_cdf('Multicast Sub 0 Run 2', df['run_2_throughput'], axes[0], reds[3], 'normal')
+            # plot_cdf('Multicast Sub 0 Run 3', df['run_3_throughput'], axes[0], reds[0], 'normal')
             plot_cdf('Multicast Sub 0 Avg.', combined_df, axes[0], reds[0], 'average')
         elif 'sub_1' in file:
-            plot_cdf('Multicast Sub 1 Run 1', df['run_1_throughput'], axes[1], reds[6], 'normal')
-            plot_cdf('Multicast Sub 1 Run 2', df['run_2_throughput'], axes[1], reds[3], 'normal')
-            plot_cdf('Multicast Sub 1 Run 3', df['run_3_throughput'], axes[1], reds[0], 'normal')
+            # plot_cdf('Multicast Sub 1 Run 1', df['run_1_throughput'], axes[1], reds[6], 'normal')
+            # plot_cdf('Multicast Sub 1 Run 2', df['run_2_throughput'], axes[1], reds[3], 'normal')
+            # plot_cdf('Multicast Sub 1 Run 3', df['run_3_throughput'], axes[1], reds[0], 'normal')
             plot_cdf('Multicast Sub 1 Avg.', combined_df, axes[1], reds[0], 'average')
         elif 'sub_2' in file:
-            plot_cdf('Multicast Sub 2 Run 1', df['run_1_throughput'], axes[2], reds[6], 'normal')
-            plot_cdf('Multicast Sub 2 Run 2', df['run_2_throughput'], axes[2], reds[3], 'normal')
-            plot_cdf('Multicast Sub 2 Run 3', df['run_3_throughput'], axes[2], reds[0], 'normal')
+            # plot_cdf('Multicast Sub 2 Run 1', df['run_1_throughput'], axes[2], reds[6], 'normal')
+            # plot_cdf('Multicast Sub 2 Run 2', df['run_2_throughput'], axes[2], reds[3], 'normal')
+            # plot_cdf('Multicast Sub 2 Run 3', df['run_3_throughput'], axes[2], reds[0], 'normal')
             plot_cdf('Multicast Sub 2 Avg.', combined_df, axes[2], reds[0], 'average')
 
 def demonstrate_ucast_vs_mcast():
