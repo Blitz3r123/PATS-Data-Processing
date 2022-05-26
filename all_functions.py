@@ -97,21 +97,35 @@ def get_test_names(file_paths):
             else:
                 comm_type = 'multicast'
             
-            if '_1_' in file:
-                pub_count = 10
-                sub_count = 10
-            elif '_2_' in file:
-                pub_count = 25
-                sub_count = 25
-            elif '_3_' in file:
-                pub_count = 50
-                sub_count = 50
-            elif '_5_' in file or '75_participants' in file:
-                pub_count = 75
-                sub_count = 75
-            else:
-                pub_count = 100
-                sub_count = 100
+            if 'v1' in file:
+                if '_1_' in file:
+                    pub_count = 10
+                    sub_count = 10
+                elif '_2_' in file:
+                    pub_count = 25
+                    sub_count = 25
+                elif '_3_' in file:
+                    pub_count = 50
+                    sub_count = 50
+                elif '_5_' in file or '75_participants' in file:
+                    pub_count = 75
+                    sub_count = 75
+                else:
+                    pub_count = 100
+                    sub_count = 100
+            elif 'v2' in file:
+                if '10p_10s' in file:
+                    pub_count = 10
+                    sub_count = 10
+                elif '25p_25s' in file:
+                    pub_count = 25
+                    sub_count = 25
+                elif '50p_50s' in file:
+                    pub_count = 50
+                    sub_count = 50
+                elif '75p_75s' in file:
+                    pub_count = 75
+                    sub_count = 75
 
             new_test_name = str(pub_count) + "P/" + str(sub_count) + "S " + comm_type.title() + " (100B)"
             test_names.append(new_test_name)
