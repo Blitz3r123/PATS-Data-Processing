@@ -1,7 +1,7 @@
-from pydoc import describe
+from scipy.stats import gaussian_kde
+from numpy import linspace
 from rich.jupyter import print
 from rich.markdown import Markdown
-
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -518,24 +518,22 @@ def plot_cdf(title, df, ax, color, type):
     else:
         cdf.plot(ax = ax, label=title, color=color)
 
-def plot_pdf(title, df, ax, color, type):
+def plot_pdf(df, ax, color, label):
     """
       Plot a PDF from a given DataFrame.
     
       Parameters:
-        title (string): Label of x-axis.
         df (DataFrame): Data to plot cdf from.
         ax (Axis): Axis to plot on.
         color (string): Colour of cdf line.
-        type (string): Whether it's an average plot (dashed lines) or normal (solid line).
+        label (string): Label of x-axis.
     
       Returns:
         None
     """
-    if 'average' in type:
-        df.plot.kde(ax = ax, label=title, color=color, ls="--")
-    else:
-        df.plot.kde(ax = ax, label=title, color=color)
+    kde = gaussian_kde(df)
+    dist_space = linspace(min(df), max(df), 1000)
+    ax.plot(dist_space, kde(dist_space), color=color, label=label)
 
 def set2_plot_latency_cdfs():
     set2_avgs = [file for file in get_files("data/set_2") if 'average' in file and 'forced_transport' in file]
@@ -3043,7 +3041,7 @@ def get_run_count(test):
   """
   metadata_file_list = [f for f in get_files(os.path.dirname(os.path.dirname(test))) if 'metadata' in f and os.path.dirname(test) in f]
   if metadata_file_list == 0:
-    console.print("No metadata files found for " + test, style="bold red")
+    print("No metadata files found for " + test, style="bold red")
   else:
     metadata_file = metadata_file_list[0]
     with open(metadata_file, 'r') as f:
@@ -3066,3 +3064,4 @@ def get_run_count(test):
             restart_counts["vm4"] = restart_counts["vm4"] + 1
 
       return (restart_counts[max(restart_counts, key=restart_counts.get)])
+  
