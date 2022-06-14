@@ -9,7 +9,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import re
 from statistics import *
-
+from collections import Counter
+from labellines import labelLine, labelLines
 from matplotlib.pyplot import figure
 from matplotlib.lines import Line2D
 
@@ -90,7 +91,10 @@ def get_test_names(file_paths):
             else:
                 comm_type = 'multicast'
 
-            test_names.append("%s 3P + 3S" %comm_type.title())
+            if '1_1' in file or '1_2' in file:
+                test_names.append("%s 3P + 3S" %comm_type.title())
+            else:
+                test_names.append("%s 1P + 1S" %comm_type.title())
         elif 'set_2' in file:
             if 'unicast' in file:
                 comm_type = 'unicast'
@@ -532,7 +536,7 @@ def plot_cdf(title, df, ax, color, type):
     else:
         cdf.plot(ax = ax, label=title, color=color)
 
-def plot_pdf(df, ax, color, label):
+def plot_pdf(label, df, ax, color):
     """
       Plot a PDF from a given DataFrame.
     
@@ -3079,3 +3083,74 @@ def get_run_count(test):
 
       return (restart_counts[max(restart_counts, key=restart_counts.get)])
   
+def plot_hist(title, df, ax, color):
+    df.hist(ax=ax, bins=1000, histtype="step", fill=None, color=color, label=title)
+    ax.grid()
+    
+def get_tp_data(files):
+    """
+      Takes throughput files and returns an object containing each subscriber and it's throughput data.
+    
+      Parameters:
+        files ([string]): List of files.
+    
+      Returns:
+        tps ({ sub_n: [], ... }): Object containing each subscriber and it's measurements.
+    """
+    tps = {}
+    for sub in get_tp_subs(files):
+        tps[sub] = []
+        
+    """
+    For each file:
+        For each sub:
+            Get average throughputs
+    """
+    for sub, file in zip(get_tp_subs(files), files):
+        df = pd.read_csv(file)
+        tps[sub] = df["avg_run_throughput"]
+    """
+    Return Example:
+    {
+        "sub_0": [1, 2, 3, ...],
+        "sub_1": [1, 2, 3, ...],
+        "sub_2": [1, 2, 3, ...]
+    }
+    
+    """
+    return tps
+
+def get_tp_subs(files):
+    return ["sub_" + file.split("sub_")[1].split("_output")[0] for file in files]
+
+def remove_infs_nans(df):
+    return df.replace([np.inf, -np.inf], np.nan).dropna()
+
+def get_total_tp(files):
+    """
+    Imagine you had the following .csv files:
+    - sub_0.csv
+    - sub_1.csv
+    - sub_2.csv
+    
+    Each file looked something like this:
+    - sub_0.csv: [2, 4, 6, 8]
+    - sub_1.csv: [4, 5, 7, 9]
+    - sub_2.csv: [2, 3, 4, 5]
+    
+    The algorithm adds up the nth element of each file:
+    - [ 2+4+2, 4+5+3, 6+7+4, 8+9+5 ]
+    
+    To create:
+    - [8, 12, 17, 22]
+    """
+    dfs = {}
+    for file in files:
+        index = files.index(file)
+        dfs[index] = pd.read_csv(file)["run_1_throughput"]
+        
+    dct = Counter()
+    for key, value in dfs.items():
+        dct[key] += value
+        
+    return pd.DataFrame(sum(dct.values()))
