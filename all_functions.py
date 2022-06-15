@@ -342,29 +342,6 @@ def get_network_data(file, format):
 
     return data
 
-def plot_table(ax, headings, rows):
-    """
-        Plot a table using matplotlib. Plots the table one row at a time starting with the headings.
-        
-        Parameters:
-            ax (Axes): Axes to plot table on.
-            headings ( [strings] ): List of headings for first row.
-            rows ( [ [strings] ] ): List of rows.
-        
-        Returns:
-            table (Table): Table created.
-    """
-    cellText = []
-    for row in rows:
-        cellText.append(row)
-
-    return ax.table(
-        cellText=cellText,
-        colLabels=headings,
-        loc='center', 
-        colLoc='center',
-        cellLoc='center')
-
 def plot_lat_summary_table(latency_files):
     """
       Creates metric summary tables for latency files.append
@@ -3147,10 +3124,224 @@ def get_total_tp(files):
     dfs = {}
     for file in files:
         index = files.index(file)
-        dfs[index] = pd.read_csv(file)["run_1_throughput"]
+        dfs[index] = pd.read_csv(file)["avg_run_throughput"]
         
     dct = Counter()
     for key, value in dfs.items():
         dct[key] += value
         
     return pd.DataFrame(sum(dct.values()))
+
+def plot_table(cellText, cellColours, rowText, rowColours, colText, colColours, tableTitle):
+    """
+      Plot a table.
+    
+      Parameters:
+        cellText [ [...], [...], ... ]: List of rows of text.
+        cellColours [ [...], [...], ... ]: List of colours for each row of text.
+        rowText [...]: List of text for the first column.
+        rowColours [...]: List of colours for the first column.
+        colText [...]: List of text for the first row.
+        colColours [...]: List of colours for the first row.
+        tableTitle str: Title of the table
+    
+      Returns:
+        fig: pyplot figure
+        ax: pyplot axis
+        table: pyplot table
+        
+    # ---------------------------------------------------------------------------- #
+    #          Quick Description of the table() parameters for reference:          #
+    # ---------------------------------------------------------------------------- #
+    
+    cellText: list of rows where each row is a list of strings
+        [ ["rowone", "rowone", "rowone"], ["rowtwo", "rowtwo", "rowtwo"] ]
+    cellColours: list of row colours where each row colour is a list of colours, the structure of this object has to match the structure of the cellText object
+        [ [rowone_colour, rowone_colour, rowone_colour], [rowtwo_colour, rowtwo_colour, rowtwo_colour] ]
+    rowLabels: list of row titles (list of strings)
+        [ "rowone", "rowtwo" ]
+    rowColours: list of colours for the first column
+        [ rowone_colour, rowtwo_colour ]
+    colLabels: list of column titles (list of strings)
+        [ "colone", "coltwo" ]
+    colColours: list of colours for the first row
+        [ colone_colour, coltwo_colour ]
+    """
+    
+    fig, ax = plt.subplots(figsize=(30, 15))
+    
+    table = ax.table(
+        cellText=cellText,
+        cellLoc='center',
+        cellColours=cellColours,
+        rowLabels=rowText,
+        rowLoc='center',
+        rowColours=rowColours,
+        colLabels=colText,
+        colLoc='center',
+        colColours=colColours,
+        loc='center'
+    )
+    
+    fig.suptitle(tableTitle, fontweight="bold")
+    table.scale(1, 2)
+    table.auto_set_font_size(False)
+    table.set_fontsize(15)
+    ax.axis("off")
+    _ = ax.axis("tight")
+    
+    fig.patch.set_visible(False)
+    
+    return fig, ax, table
+    
+def plot_summary_table(tests):
+    """
+    What should this function do?
+    - Summarise the throughput and latency for multiple tests.
+    
+    What should be passed in?
+    - List of tests
+        - Latency DF
+        - Throughput DF
+    [
+        {"test_name": "test_one", "lat_df": lat_df, "tp_df": tp_df},
+        {"test_name": "test_two", "lat_df": lat_df, "tp_df": tp_df},
+        ...
+    ]
+    
+    How should this function work?
+    1. Create rowText containing the titles of each summary stat
+        - ["", "lat min", "tp min", "lat 25%", "tp 25%, "lat median", "tp median", "lat 75%", "tp 75%", "lat iqr", "tp iqr", "lat max", "tp max", "lat mean", "tp mean", "lat mode", "tp mode", "lat std", "tp std", "lat var", "tp var"]
+    2. Create lists for each stat
+        lat mins
+        tp mins
+        lat 25%
+        tp 25%
+        lat medians
+        tp medians
+        lat 75%
+        tp 75%
+        lat iqrs
+        tp iqrs
+        lat maxs
+        tp maxs
+        lat means
+        tp means
+        lat modes
+        tp modes
+        lat stds
+        tp stds
+        lat vars
+        tp var
+    3. Loop through each test
+        3.1. Collect list of test_name as the colText
+        3.2. Get each stat for the test and append to the appropriate stat list
+        
+    """
+    # 1. Create rowText containing the titles of each summary stat
+    rowText = ["", "lat min", "tp min", "lat lower quartile", "tp lower quartile", "lat median", "tp median", "lat upper quartile", "tp upper quartile", "lat iqr", "tp iqr", "lat max", "tp max", "lat mean", "tp mean", "lat std", "tp std", "lat var", "tp var"]
+    rowText = [text.title() for text in rowText]
+    # 2. Create list for each stat
+    lat_mins = []
+    tp_mins = []
+    lat_lower_quartiles = []
+    tp_lower_quartiles = []
+    lat_medians = []
+    tp_medians = []
+    lat_upper_quartiles = []
+    tp_upper_quartiles = []
+    lat_iqrs = []
+    tp_iqrs = []
+    lat_maxs = []
+    tp_maxs = []
+    lat_means = []
+    tp_means = []
+    lat_stds = []
+    tp_stds = []
+    lat_vars = []
+    tp_vars = []
+    
+    white_cell = []
+    for test in tests:
+        white_cell.append("#fff")
+    test_names = [item["test_name"] for item in tests]
+    
+    cellText = [test_names, lat_mins, tp_mins, lat_lower_quartiles, tp_lower_quartiles, lat_medians, tp_medians, lat_upper_quartiles, tp_upper_quartiles, lat_iqrs, tp_iqrs, lat_maxs, tp_maxs, lat_means, tp_means, lat_stds, tp_stds, lat_vars, tp_vars]
+    
+    redlist = []
+    greenlist = []
+    for i in range(len(test_names)):
+        redlist.append(reds[8])
+        greenlist.append(greens[8])
+        
+    cellColours = []
+    rowColours = []
+    for i in range(len(cellText)):
+        if i == 0:
+            cellColours.append(white_cell)
+            rowColours.append("#fff")
+        elif i % 2 == 0:
+            cellColours.append(greenlist)
+            rowColours.append(greens[8])
+        else:
+            cellColours.append(redlist)
+            rowColours.append(reds[8])
+    
+    # 3. Loop through each test
+    for test in tests:
+        # 3.2. Get each stat for the test and append to the appropriate stat list
+        lat_df = test["lat_df"]
+        lat_mins.append(str(format_number(int(lat_df.min()))))
+        lat_lower_quartiles.append(str(format_number(int(lat_df.quantile(.25)))))
+        lat_medians.append(str(format_number(int(lat_df.median()))))
+        lat_upper_quartiles.append(str(format_number(int(lat_df.quantile(.75)))))
+        lat_iqrs.append(str(format_number(int(lat_df.quantile(.75) - lat_df.quantile(.25)))))
+        lat_maxs.append(str(format_number(int(lat_df.max()))))
+        lat_means.append(str(format_number(int(lat_df.mean()))))
+        lat_stds.append(str(format_number(int(lat_df.std()))))
+        lat_vars.append(str(format_number(int(lat_df.var()))))
+        
+        tp_df = test["tp_df"]
+        tp_mins.append(str(format_number(int(tp_df.min()))))
+        tp_lower_quartiles.append(str(format_number(int(tp_df.quantile(.25)))))
+        tp_medians.append(str(format_number(int(tp_df.median()))))
+        tp_upper_quartiles.append(str(format_number(int(tp_df.quantile(.75)))))
+        tp_iqrs.append(str(format_number(int(tp_df.quantile(.75) - tp_df.quantile(.25)))))
+        tp_maxs.append(str(format_number(int(tp_df.max()))))
+        tp_means.append(str(format_number(int(tp_df.mean()))))
+        tp_stds.append(str(format_number(int(tp_df.std()))))
+        tp_vars.append(str(format_number(int(tp_df.var()))))
+    
+    # print("cellText length: " + str(len(cellText)))
+    # print("cellText item lengths: " + str([len(item) for item in cellText]))
+    # print("rowText length: " + str(len(rowText)))
+    # print("test_names length: " + str(len(test_names)))
+    # print(cellText)
+    plot_table(cellText, cellColours, rowText, rowColours, None, None, None)
+ 
+def get_test_dfs(files):
+    """
+      Give this function a list containing the unicast and multicast average_latencies file and the average_throughputs files and it'll give you back the dataframes for the latencies and throughput for each file.
+    
+      Parameters:
+        files ([str]): List containing the average_latencies and average_throughputs files.
+    
+      Returns:
+        test_dfs: An object containing the latency and throughput data frames for each unicast and multicast file.
+    """
+    test_files = {
+        "unicast": [file for file in files if "unicast" in file],
+        "multicast": [file for file in files if "multicast" in file],
+    }
+    test_dfs = {
+        "unicast": {
+            "lat": remove_infs_nans(pd.read_csv( [file for file in test_files["unicast"] if "latencies" in file][0] )["run_1_latency"]),
+            "tp": remove_infs_nans(get_total_tp( [file for file in test_files["unicast"] if "throughputs" in file] )["avg_run_throughput"])
+        },
+        "multicast": {
+            "lat": remove_infs_nans(pd.read_csv( [file for file in test_files["multicast"] if "latencies" in file][0] )["run_1_latency"]),
+            "tp": remove_infs_nans(get_total_tp( [file for file in test_files["multicast"] if "throughputs" in file] )["avg_run_throughput"])
+        }      
+    }
+    
+    return test_dfs
