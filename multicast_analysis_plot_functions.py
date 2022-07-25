@@ -8,16 +8,16 @@ def ucast_vs_mcast_lat_boxplots():
     s1_lats = [file for file in get_files("data/v2/set_1") if "average_latencies" in file]
     
     ucast_lats = {
-        "1p1s": [file for file in s1_lats if "1_1_unicast" in file],
-        "3p3s": [file for file in s1_lats if "1_3_unicast" in file],
+        "1p1s": [file for file in s1_lats if "1_3_unicast" in file],
+        "3p3s": [file for file in s1_lats if "1_1_unicast" in file],
         "10p10s": [file for file in lats if "10p_10s" in file and "unicast" in file],
         "25p25s": [file for file in lats if "25p_25s" in file and "unicast" in file],
         "50p50s": [file for file in lats if "50p_50s" in file and "unicast" in file],
         "75p75s": [file for file in lats if "75p_75s" in file and "unicast" in file]
     }
     mcast_lats = {
-        "1p1s": [file for file in s1_lats if "1_2_multicast" in file],
-        "3p3s": [file for file in s1_lats if "1_4_multicast" in file],
+        "1p1s": [file for file in s1_lats if "1_4_multicast" in file],
+        "3p3s": [file for file in s1_lats if "1_2_multicast" in file],
         "10p10s": [file for file in lats if "10p_10s" in file and "multicast" in file],
         "25p25s": [file for file in lats if "25p_25s" in file and "multicast" in file],
         "50p50s": [file for file in lats if "50p_50s" in file and "multicast" in file],
@@ -144,16 +144,16 @@ def ucast_vs_mcast_latency_line_plots():
     s1_lats = [file for file in get_files("data/v2/set_1") if "average_latencies" in file]
     
     ucast_lats = {
-        "1p1s": [file for file in s1_lats if "1_1_unicast" in file],
-        "3p3s": [file for file in s1_lats if "1_3_unicast" in file],
+        "1p1s": [file for file in s1_lats if "1_3_unicast" in file],
+        "3p3s": [file for file in s1_lats if "1_1_unicast" in file],
         "10p10s": [file for file in lats if "10p_10s" in file and "unicast" in file],
         "25p25s": [file for file in lats if "25p_25s" in file and "unicast" in file],
         "50p50s": [file for file in lats if "50p_50s" in file and "unicast" in file],
         "75p75s": [file for file in lats if "75p_75s" in file and "unicast" in file]
     }
     mcast_lats = {
-        "1p1s": [file for file in s1_lats if "1_2_multicast" in file],
-        "3p3s": [file for file in s1_lats if "1_4_multicast" in file],
+        "1p1s": [file for file in s1_lats if "1_4_multicast" in file],
+        "3p3s": [file for file in s1_lats if "1_2_multicast" in file],
         "10p10s": [file for file in lats if "10p_10s" in file and "multicast" in file],
         "25p25s": [file for file in lats if "25p_25s" in file and "multicast" in file],
         "50p50s": [file for file in lats if "50p_50s" in file and "multicast" in file],
@@ -260,16 +260,16 @@ def ucast_vs_mcast_cdfs():
     s1_lats = [file for file in get_files("data/v2/set_1") if "average_latencies" in file]
     
     ucast_lats = {
-        "1p1s": [file for file in s1_lats if "1_1_unicast" in file],
-        "3p3s": [file for file in s1_lats if "1_3_unicast" in file],
+        "1p1s": [file for file in s1_lats if "1_3_unicast" in file],
+        "3p3s": [file for file in s1_lats if "1_1_unicast" in file],
         "10p10s": [file for file in lats if "10p_10s" in file and "unicast" in file],
         "25p25s": [file for file in lats if "25p_25s" in file and "unicast" in file],
         "50p50s": [file for file in lats if "50p_50s" in file and "unicast" in file],
         "75p75s": [file for file in lats if "75p_75s" in file and "unicast" in file]
     }
     mcast_lats = {
-        "1p1s": [file for file in s1_lats if "1_2_multicast" in file],
-        "3p3s": [file for file in s1_lats if "1_4_multicast" in file],
+        "1p1s": [file for file in s1_lats if "1_4_multicast" in file],
+        "3p3s": [file for file in s1_lats if "1_2_multicast" in file],
         "10p10s": [file for file in lats if "10p_10s" in file and "multicast" in file],
         "25p25s": [file for file in lats if "25p_25s" in file and "multicast" in file],
         "50p50s": [file for file in lats if "50p_50s" in file and "multicast" in file],
@@ -317,7 +317,7 @@ def ucast_vs_mcast_cdfs():
     top4 = plt.subplot(grid[1, 1])
     top5 = plt.subplot(grid[1, 2])
     
-    main = plt.subplot(grid[2:6, 0:3])
+    # main = plt.subplot(grid[2:6, 0:3])
     
     # ---------------------------------------------------------------------------- #
     #                                     CDFs                                     #
@@ -341,21 +341,25 @@ def ucast_vs_mcast_cdfs():
         elif "75" in item:
             ax = top5
             title = "75P + 75S Unicast vs Multicast Latency CDF"
-        ax.set_title(title, fontsize=12, fontweight="bold")
+        ax.set_title(title, fontsize=20, fontweight="bold")
         plot_cdf("Unicast", ucast_dfs[item], ax, greens[0], 'normal')
         plot_cdf("Multicast", mcast_dfs[item], ax, reds[0], 'normal')
-        plot_cdf(item + " Unicast", ucast_dfs[item], main, greens[0], 'normal')
-        plot_cdf(item + " Multicast", mcast_dfs[item], main, reds[0], 'normal')
-        ax.legend()
+        # plot_cdf(item + " Unicast", ucast_dfs[item], main, greens[0], 'normal')
+        # plot_cdf(item + " Multicast", mcast_dfs[item], main, reds[0], 'normal')
+        ax.legend(prop={'size': 25})
         ax.grid(color="#ddd")
         ax.set_ylim(ymin=0, ymax=1)
-        ax.set_ylabel("$F(x)$")
-        ax.set_xlabel("Latency (ms)")
+        ax.set_ylabel("$F(x)$", fontsize=20)
+        ax.set_xlabel("Latency (ms)", fontsize=20)
+        ax.spines.right.set_visible(False)
+        ax.spines.top.set_visible(False)
+        ax.tick_params(axis="both", which="major", labelsize=20)
+        ax.tick_params(axis="both", which="minor", labelsize=20)
     # ---------------------------------------------------------------------------- #
     #                                   X-Limits                                   #
     # ---------------------------------------------------------------------------- #
-    top0.set_xlim(xmin=0.1, xmax=1.5)
-    top1.set_xlim(xmin=0.12, xmax=0.4)
+    top0.set_xlim(xmin=0.12, xmax=0.4)
+    top1.set_xlim(xmin=0.1, xmax=1.5)
     top2.set_xlim(xmin=0, xmax=13)
     top3.set_xlim(xmin=0, xmax=100)
     top4.set_xlim(xmin=0, xmax=500)
@@ -364,11 +368,11 @@ def ucast_vs_mcast_cdfs():
     # ---------------------------------------------------------------------------- #
     #                                 Main Settings                                #
     # ---------------------------------------------------------------------------- #
-    main.set_ylabel("$F(x)$")
-    main.set_xlabel("Latency (ms)")
-    main.set_ylim(ymin=-0.02, ymax=1.02)
-    main.set_xlim(xmin=0, xmax=1000)
-    main.grid(color="#ddd")
+    # main.set_ylabel("$F(x)$")
+    # main.set_xlabel("Latency (ms)")
+    # main.set_ylim(ymin=-0.02, ymax=1.02)
+    # main.set_xlim(xmin=0, xmax=1000)
+    # main.grid(color="#ddd")
     # 
     # labelLines(main.get_lines(), align=False)
     
@@ -381,16 +385,16 @@ def ucast_vs_mcast_tp_boxplots():
     tps = [file for file in get_files("data/v2/set_2") if "average_throughput" in file]
     s1tps = [file for file in get_files("data/v2/set_1") if "average_throughput" in file]
     ucast_tps = {
-        "1p1s": [file for file in s1tps if "1_unicast" in file],
-        "3p3s": [file for file in s1tps if "3_unicast" in file],
+        "1p1s": [file for file in s1tps if "3_unicast" in file],
+        "3p3s": [file for file in s1tps if "1_unicast" in file],
         "10p10s": [file for file in tps if "10p_10s" in file and "unicast" in file],
         "25p25s": [file for file in tps if "25p_25s" in file and "unicast" in file],
         "50p50s": [file for file in tps if "50p_50s" in file and "unicast" in file],
         "75p75s": [file for file in tps if "75p_75s" in file and "unicast" in file]
     }
     mcast_tps = {
-        "1p1s": [file for file in s1tps if "2_multicast" in file],
-        "3p3s": [file for file in s1tps if "4_multicast" in file],
+        "1p1s": [file for file in s1tps if "4_multicast" in file],
+        "3p3s": [file for file in s1tps if "2_multicast" in file],
         "10p10s": [file for file in tps if "10p_10s" in file and "multicast" in file],
         "25p25s": [file for file in tps if "25p_25s" in file and "multicast" in file],
         "50p50s": [file for file in tps if "50p_50s" in file and "multicast" in file],
@@ -514,16 +518,16 @@ def ucast_vs_mcast_tp_line_plots():
     tps = [file for file in get_files("data/v2/set_2") if "average_throughput" in file]
     s1tps = [file for file in get_files("data/v2/set_1") if "average_throughput" in file]
     ucast_tps = {
-        "1p1s": [file for file in s1tps if "1_unicast" in file],
-        "3p3s": [file for file in s1tps if "3_unicast" in file],
+        "1p1s": [file for file in s1tps if "3_unicast" in file],
+        "3p3s": [file for file in s1tps if "1_unicast" in file],
         "10p10s": [file for file in tps if "10p_10s" in file and "unicast" in file],
         "25p25s": [file for file in tps if "25p_25s" in file and "unicast" in file],
         "50p50s": [file for file in tps if "50p_50s" in file and "unicast" in file],
         "75p75s": [file for file in tps if "75p_75s" in file and "unicast" in file]
     }
     mcast_tps = {
-        "1p1s": [file for file in s1tps if "2_multicast" in file],
-        "3p3s": [file for file in s1tps if "4_multicast" in file],
+        "1p1s": [file for file in s1tps if "4_multicast" in file],
+        "3p3s": [file for file in s1tps if "2_multicast" in file],
         "10p10s": [file for file in tps if "10p_10s" in file and "multicast" in file],
         "25p25s": [file for file in tps if "25p_25s" in file and "multicast" in file],
         "50p50s": [file for file in tps if "50p_50s" in file and "multicast" in file],
@@ -625,16 +629,16 @@ def ucast_vs_mcast_tp_cdfs():
     tps = [file for file in get_files("data/v2/set_2") if "average_throughput" in file]
     s1tps = [file for file in get_files("data/v2/set_1") if "average_throughput" in file]
     ucast_tps = {
-        "1p1s": [file for file in s1tps if "1_unicast" in file],
-        "3p3s": [file for file in s1tps if "3_unicast" in file],
+        "1p1s": [file for file in s1tps if "3_unicast" in file],
+        "3p3s": [file for file in s1tps if "1_unicast" in file],
         "10p10s": [file for file in tps if "10p_10s" in file and "unicast" in file],
         "25p25s": [file for file in tps if "25p_25s" in file and "unicast" in file],
         "50p50s": [file for file in tps if "50p_50s" in file and "unicast" in file],
         "75p75s": [file for file in tps if "75p_75s" in file and "unicast" in file]
     }
     mcast_tps = {
-        "1p1s": [file for file in s1tps if "2_multicast" in file],
-        "3p3s": [file for file in s1tps if "4_multicast" in file],
+        "1p1s": [file for file in s1tps if "4_multicast" in file],
+        "3p3s": [file for file in s1tps if "2_multicast" in file],
         "10p10s": [file for file in tps if "10p_10s" in file and "multicast" in file],
         "25p25s": [file for file in tps if "25p_25s" in file and "multicast" in file],
         "50p50s": [file for file in tps if "50p_50s" in file and "multicast" in file],
@@ -681,47 +685,49 @@ def ucast_vs_mcast_tp_cdfs():
     top4 = plt.subplot(grid[1, 1])
     top5 = plt.subplot(grid[1, 2])
     
-    main = plt.subplot(grid[2:6, 0:3])
+    # main = plt.subplot(grid[2:6, 0:3])
     
     # ---------------------------------------------------------------------------- #
     #                                     CDFs                                     #
     # ---------------------------------------------------------------------------- #
     for item in ucast_tp_dfs:
         if "1p1s" in item:
-            title = "1P + 1S Unicast vs Multicast Throughput Boxplots"
+            title = "1P + 1S Unicast vs Multicast Throughput CDF"
             ax = top0
         elif "3p3s" in item:
-            title = "3P + 3S Unicast vs Multicast Throughput Boxplots"
+            title = "3P + 3S Unicast vs Multicast Throughput CDF"
             ax = top1
         elif "10p10s" in item:
-            title = "10P + 10S Unicast vs Multicast Throughput Boxplots"
+            title = "10P + 10S Unicast vs Multicast Throughput CDF"
             ax = top2
         elif "25p25s" in item:
-            title = "25P + 25S Unicast vs Multicast Throughput Boxplots"
+            title = "25P + 25S Unicast vs Multicast Throughput CDF"
             ax = top3
         elif "50p50s" in item:
-            title = "50P + 50S Unicast vs Multicast Throughput Boxplots"
+            title = "50P + 50S Unicast vs Multicast Throughput CDF"
             ax = top4
         elif "75p75s" in item:
-            title = "75P + 75S Unicast vs Multicast Throughput Boxplots"
+            title = "75P + 75S Unicast vs Multicast Throughput CDF"
             ax = top5
-        ax.set_title(title, fontsize=12, fontweight="bold")
+        ax.set_title(title, fontsize=20, fontweight="bold")
         plot_cdf("Unicast", ucast_tp_dfs[item], ax, greens[0], 'normal')
         plot_cdf("Multicast", mcast_tp_dfs[item], ax, reds[0], 'normal')
-        plot_cdf(item + " Unicast", ucast_tp_dfs[item], main, greens[0], 'normal')
-        plot_cdf(item + " Multicast", mcast_tp_dfs[item], main, reds[0], 'normal')
-        ax.legend()
+        # plot_cdf(item + " Unicast", ucast_tp_dfs[item], main, greens[0], 'normal')
+        # plot_cdf(item + " Multicast", mcast_tp_dfs[item], main, reds[0], 'normal')
+        ax.legend(prop={'size': 25})
         ax.grid(color="#ddd")
         ax.set_ylim(ymin=0, ymax=1)
-        ax.set_ylabel("$F(x)$")
-        ax.set_xlabel("Throughput (mbps)")
+        ax.set_ylabel("$F(x)$", fontsize=20)
+        ax.set_xlabel("Throughput (mbps)", fontsize=20)
         ax.spines.top.set_visible(False)
         ax.spines.right.set_visible(False)
+        ax.tick_params(axis="both", which="major", labelsize=20)
+        ax.tick_params(axis="both", which="minor", labelsize=20)
     # ---------------------------------------------------------------------------- #
     #                                   X-Limits                                   #
     # ---------------------------------------------------------------------------- #
-    top0.set_xlim(xmin=90, xmax=220)
-    top1.set_xlim(xmin=5, xmax=110)
+    top0.set_xlim(xmin=5, xmax=110)
+    top1.set_xlim(xmin=90, xmax=220)
     top2.set_xlim(xmin=200, xmax=350)
     top3.set_xlim(xmin=125, xmax=250)
     top4.set_xlim(xmin=100, xmax=200)
@@ -730,13 +736,13 @@ def ucast_vs_mcast_tp_cdfs():
     # ---------------------------------------------------------------------------- #
     #                                 Main Settings                                #
     # ---------------------------------------------------------------------------- #
-    main.set_ylabel("$F(x)$")
-    main.set_xlabel("Throughput (mbps)")
-    main.set_ylim(ymin=-0.02, ymax=1.02)
-    main.set_xlim(xmin=0, xmax=350)
-    main.grid(color="#ddd")
-    main.spines.top.set_visible(False)
-    main.spines.right.set_visible(False)
-    labelLines(main.get_lines(), align=False)
+    # main.set_ylabel("$F(x)$")
+    # main.set_xlabel("Throughput (mbps)")
+    # main.set_ylim(ymin=-0.02, ymax=1.02)
+    # main.set_xlim(xmin=0, xmax=350)
+    # main.grid(color="#ddd")
+    # main.spines.top.set_visible(False)
+    # main.spines.right.set_visible(False)
+    # labelLines(main.get_lines(), align=False)
     
     plt.tight_layout()

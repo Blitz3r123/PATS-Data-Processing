@@ -3271,8 +3271,8 @@ def plot_summary_table(tests):
     redlist = []
     greenlist = []
     for i in range(len(test_names)):
-        redlist.append(reds[8])
-        greenlist.append(greens[8])
+        redlist.append(blues[9])
+        greenlist.append("#ddd")
         
     cellColours = []
     rowColours = []
@@ -3282,10 +3282,10 @@ def plot_summary_table(tests):
             rowColours.append("#fff")
         elif i % 2 == 0:
             cellColours.append(greenlist)
-            rowColours.append(greens[8])
+            rowColours.append("#ddd")
         else:
             cellColours.append(redlist)
-            rowColours.append(reds[8])
+            rowColours.append(blues[9])
     
     # 3. Loop through each test
     for test in tests:
